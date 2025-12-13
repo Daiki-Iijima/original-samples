@@ -1,0 +1,269 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.2.7" pages="2">
+  <diagram name="ページ1" id="0ZuEa_pnRiy0VZtKs7AT">
+    <mxGraphModel dx="1233" dy="1072" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="xF6msfPIjLeHT22YY_qW-1" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="249.64" y="420" as="sourcePoint" />
+            <mxPoint x="249.64" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-20" value="データ" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-1">
+          <mxGeometry x="-0.0429" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-2" value="AVCaptureSession" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="360" width="460" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-3" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="440" y="280" as="sourcePoint" />
+            <mxPoint x="440" y="350" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="440" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-5" value="紐付け &amp;amp; データ流し込み" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-3">
+          <mxGeometry x="0.1439" relative="1" as="geometry">
+            <mxPoint y="-7" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-4" value="InputDevice" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="400" y="230" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="294.64" y="550" as="sourcePoint" />
+            <mxPoint x="294.64" y="670" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-23" value="データ" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-21">
+          <mxGeometry x="0.3494" y="1" relative="1" as="geometry">
+            <mxPoint x="-1" y="-21" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-6" value="AVCaptureVideoDataOutput" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="500" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-7" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.533;entryY=1.034;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="339.64" y="490" as="sourcePoint" />
+            <mxPoint x="339.91999999999996" y="421.3599999999999" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-8" value="紐付け" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-7">
+          <mxGeometry x="0.1439" relative="1" as="geometry">
+            <mxPoint x="-1" y="5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-13" value="AVCaptureConnection" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="595" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-22" value="AVCaptureVideoDataOutputSampleBufferDelegate&lt;br&gt;(func captureOutput)" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="690" width="310" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-24" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="539.64" y="420" as="sourcePoint" />
+            <mxPoint x="539.64" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-25" value="データ" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-24">
+          <mxGeometry x="-0.0429" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-26" value="AVCapureVideoPreviewLayer" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="500" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-27" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.533;entryY=1.034;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="629.64" y="490" as="sourcePoint" />
+            <mxPoint x="629.92" y="421.3599999999999" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-28" value="紐付け(自動)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-27">
+          <mxGeometry x="0.1439" relative="1" as="geometry">
+            <mxPoint x="-1" y="5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="584.64" y="550" as="sourcePoint" />
+            <mxPoint x="584.64" y="670" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-30" value="データ" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="xF6msfPIjLeHT22YY_qW-29">
+          <mxGeometry x="0.3494" y="1" relative="1" as="geometry">
+            <mxPoint x="-1" y="-21" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-32" value="Viewに表示" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="510" y="690" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-36" value="設定" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="220" y="550" width="20" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-38" value="AVCaptureConnection" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="595" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xF6msfPIjLeHT22YY_qW-39" value="設定" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="540" y="550" width="20" height="120" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="TV_OdozsuNaWsHPz5rZG" name="ページ2">
+    <mxGraphModel dx="1572" dy="2308" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="mAAX2--17eaFV9hDCf5K-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="アプリ起動" vertex="1">
+          <mxGeometry height="60" width="280" x="232.5" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="ObjCランタイムがNSObject継承クラスとメソッドを登録" vertex="1">
+          <mxGeometry height="60" width="350" x="197.5" y="325" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-5" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="372.13" y="265" as="sourcePoint" />
+            <mxPoint x="372.13" y="315" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-7" parent="1" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;" value="" vertex="1">
+          <mxGeometry height="210" width="30" x="552.5" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-22" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="CameraService&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Selectorテーブル&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="145" x="587.5" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-23" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=left;verticalAlign=top;rounded=0;" value="&lt;div&gt;Class: &lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(204, 255, 153));&quot;&gt;CameraService&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; Methods:&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(51, 153, 255));&quot;&gt;init&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(51, 153, 255));&quot;&gt;&amp;nbsp; &amp;nbsp; dealloc&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(51, 153, 255));&quot;&gt;&amp;nbsp; &amp;nbsp; class methods...&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="90" width="145" x="587.5" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-24" parent="1" style="text;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;" value="final class &lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(204, 255, 153));&quot;&gt;CameraService&lt;/font&gt; : NSObject&amp;nbsp;" vertex="1">
+          <mxGeometry height="40" width="231" x="682.5" y="215" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-28" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(204, 255, 153));&quot;&gt;CamerService&lt;/font&gt;のinitメソッドが呼ばれる" vertex="1">
+          <mxGeometry height="60" width="350" x="197.5" y="465" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-29" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="372.13" y="399.5" as="sourcePoint" />
+            <mxPoint x="372.13" y="449.5" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-30" parent="1" style="text;whiteSpace=wrap;html=1;strokeColor=default;rounded=1;align=center;verticalAlign=middle;fontColor=default;fillColor=none;" value="&lt;span style=&quot;font-family: Helvetica; font-size: 12px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-indent: 0px; text-transform: none; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; white-space: normal; text-decoration-thickness: initial; text-decoration-style: initial; text-decoration-color: initial; float: none; display: inline !important;&quot;&gt;AVCaptureVideoDataOutput に &lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(204, 255, 153));&quot;&gt;self&lt;/font&gt;(&lt;font style=&quot;color: light-dark(rgb(0, 0, 0), rgb(204, 255, 153));&quot;&gt;CameraService&lt;/font&gt;) を delegate として渡す&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="465" x="140" y="605" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-32" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;dashed=1;" value="&lt;div&gt;output.setSampleBufferDelegate(self, queue: outputQueue)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="50" width="400" x="182.5" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-33" parent="1" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;" value="" vertex="1">
+          <mxGeometry height="150" width="30" x="622.5" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-34" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="AVCaptureVideoDataOutput&lt;br&gt;インスタンス" vertex="1">
+          <mxGeometry height="30" width="190" x="672.5" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-35" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;div style=&quot;&quot;&gt;delegate Pointer = self&lt;/div&gt;" vertex="1">
+          <mxGeometry height="40" width="180" x="672.5" y="605" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-36" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="792.5" y="265" as="sourcePoint" />
+            <mxPoint x="742.5" y="355" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-37" connectable="0" parent="mAAX2--17eaFV9hDCf5K-36" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="作成" vertex="1">
+          <mxGeometry relative="1" x="0.1407" y="2" as="geometry">
+            <mxPoint x="4" y="-2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-39" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="ここでdelegate Pointerが持っているのは、self(CmaeraService)のインスタンスへのポインタ" vertex="1">
+          <mxGeometry height="30" width="280" x="672.5" y="665" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-40" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="372.02" y="545" as="sourcePoint" />
+            <mxPoint x="372.02" y="595" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-41" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="371.96999999999997" y="745" as="sourcePoint" />
+            <mxPoint x="371.96999999999997" y="795" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-42" parent="1" style="text;whiteSpace=wrap;html=1;strokeColor=default;rounded=1;align=center;verticalAlign=middle;fontColor=default;fillColor=none;" value="&lt;span style=&quot;text-align: left;&quot;&gt;カメラがフレームを取得&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="242.5" x="251.25" y="805" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-43" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="962.5" y="585" as="sourcePoint" />
+            <mxPoint x="828.5" y="623" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-45" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;" value="&lt;div&gt;struct objc_object {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; Class isa;&amp;nbsp; &amp;nbsp;//&amp;nbsp; インスタンスが属するクラスへの参照&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; // インスタンス変数（プロパティ）たち&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;" vertex="1">
+          <mxGeometry height="80" width="310" x="972.5" y="555" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-46" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="インスタンスの内部構造" vertex="1">
+          <mxGeometry height="30" width="310" x="972.5" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-47" parent="1" style="whiteSpace=wrap;html=1;align=left;" value="&lt;div&gt;struct objc_class {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; Class superclass;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 親クラスへのポインタ&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct method_list *methods;&amp;nbsp; // selector tableへのポインタ&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct ivar_list *ivars;&amp;nbsp; &amp;nbsp; &amp;nbsp; // プロパティや変数の情報&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; const char *name;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// クラス名&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; uint32_t instance_size;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// インスタンスサイズ&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="330" x="1162.5" y="355" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-49" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1088.5" y="578" as="sourcePoint" />
+            <mxPoint x="1312.5" y="495" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-52" connectable="0" parent="mAAX2--17eaFV9hDCf5K-49" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="isaの参照先" vertex="1">
+          <mxGeometry relative="1" x="-0.1714" y="4" as="geometry">
+            <mxPoint x="73" y="-25" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-51" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="クラスメタデータ" vertex="1">
+          <mxGeometry height="30" width="320" x="1162.5" y="325" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-53" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1172.5" y="399" as="sourcePoint" />
+            <mxPoint x="742.5" y="385" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-56" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;span style=&quot;text-align: left;&quot;&gt;AVFoundation が selector を使って Swift のメソッドを探す&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="370" x="187.5" y="955" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-57" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="371.97" y="885" as="sourcePoint" />
+            <mxPoint x="371.97" y="935" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-58" parent="1" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;labelPosition=left;verticalLabelPosition=middle;align=right;verticalAlign=middle;" value="" vertex="1">
+          <mxGeometry height="100" width="20" x="582.5" y="935" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-60" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;div style=&quot;line-height: 210%;&quot;&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;1. delegateに登録されたポインタを辿って対象のメソッドを探す&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;2.&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;objc_msgSend によって Swift メソッドが実行される&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="355" x="617.5" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-61" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;dashed=1;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="772.5" y="935" as="sourcePoint" />
+            <mxPoint x="772.5" y="725" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-62" connectable="0" parent="mAAX2--17eaFV9hDCf5K-61" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="この流れをたどって&lt;div&gt;Swiftで書かれたハンドリングメソッドを実行&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.2694" y="-1" as="geometry">
+            <mxPoint y="24" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mAAX2--17eaFV9hDCf5K-63" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontStyle=1;fontSize=30;" value="NSObject ProtocolでSwiftで書いたDelegateハンドリングメソッドが実行される流れ" vertex="1">
+          <mxGeometry height="30" width="1210" x="230" y="70" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
