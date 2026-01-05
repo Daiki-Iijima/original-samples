@@ -23,5 +23,4 @@
 
 ## 動作サンプル動画
 
-
-
+https://github.com/user-attachments/assets/28c46742-e425-4269-9d6b-4ddc1553b8cf
