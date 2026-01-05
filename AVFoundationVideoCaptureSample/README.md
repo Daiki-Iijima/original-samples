@@ -13,10 +13,13 @@
 ## 実際に動かしたときの動画
 
 - iPad
-    ![iPad](../doc/iPad動作サンプル.mp4)
+
+    https://github.com/user-attachments/assets/7a890b94-3904-4790-a54d-9c0c74a0733c
+
 
 - iPhone
-    ![iPhone](../doc/iPhone動作サンプル.mp4)
+
+    https://github.com/user-attachments/assets/6465f53d-a848-4382-b863-e3944f95a418
 
 ## 学んだこと・注意点(あれば)
 
