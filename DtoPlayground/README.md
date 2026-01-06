@@ -6,6 +6,8 @@
 
 - iPhone
 
+    https://github.com/user-attachments/assets/11eec5db-6327-4ef2-8cc6-e207d084ba1f
+
 ## 学んだこと・注意点
 
 ### Persistenceの立ち位置
@@ -30,7 +32,7 @@ TimelineDocument構造体については、バージョニングとルートの�
 │    └─ [ TimelineEntry ]            │
 │           ├─ type: "text"          │
 │           ├─ type: "mood"          │
-│           └─ type: "photo" (未知)  │
+│           └─ type: "photo"(unknown)│
 │                                    │
 │  TimelineEntry                     │
 │    ├─ type: String                 │
