@@ -1,13 +1,16 @@
-import SwiftUI
 import DrawingKit
+import SwiftUI
 
 struct ContentView: View {
 
-    // MARK: - DrawingKit 操作用
+    // MARK: - DrawingKit 操作用（Representableから注入）
     @State private var canvas: DrawingCanvasView?
 
-    // MARK: - Draw settings
-    @State private var mode: DrawMode = .pen
+    // MARK: - App Mode（アプリ全体のモード）
+    @State private var appMode: AppMode = .normal
+
+    // MARK: - Draw tool settings（描画モード内ツール）
+    @State private var drawMode: DrawMode = .pen
     @State private var color: Color = .red
     @State private var lineWidth: CGFloat = 4
     @State private var opacity: CGFloat = 1.0
@@ -17,32 +20,114 @@ struct ContentView: View {
     @State private var viewportState = ViewportState.initial
     @State private var zoomRequest: ZoomRequest = .none
 
+    // MARK: - 右下パネル位置（ドラッグ移動）
+    @State private var panelPos: CGPoint = .zero
+    @State private var didInitPanelPos: Bool = false
+
+    private let panelSize = CGSize(width: 260, height: 180)
+
     var body: some View {
         ZStack {
-
-            // ==== Zoom + Drawing ====
-            ZoomableDrawingRepresentable(
-                image: UIImage(named: "sample1")!, // Assetsに入れておく
-                canvasRef: $canvas,
-                viewportState: $viewportState,
-                zoomRequest: $zoomRequest
-            )
-            .ignoresSafeArea()
-
-            // ==== UI Overlay ====
-            VStack {
-                topBar
-                Spacer()
-                bottomBar
-            }
-            .padding()
+            canvasLayer
+            topBarLayer
+            drawingPanelLayer
         }
+        .onChange(of: canvas) { _ in
+            applyAppModeToCanvas()
+            syncCanvasToolState()
+        }
+        .onChange(of: appMode) { _ in
+            applyAppModeToCanvas()
+            syncCanvasToolState()
+        }
+        .onChange(of: drawMode) { _ in syncCanvasToolState() }
+        .onChange(of: color) { _ in syncCanvasToolState() }
+        .onChange(of: lineWidth) { _ in syncCanvasToolState() }
+        .onChange(of: opacity) { _ in syncCanvasToolState() }
+        .onChange(of: eraserRadius) { _ in syncCanvasToolState() }
     }
 }
 
-private extension ContentView {
+// MARK: - Layers（ここに分割すると型推論が軽くなる）
 
-    var topBar: some View {
+extension ContentView {
+
+    fileprivate var canvasLayer: some View {
+        ZoomableDrawingRepresentable(
+            image: UIImage(named: "sample1")!,
+            canvasRef: $canvas,
+            viewportState: $viewportState,
+            zoomRequest: $zoomRequest
+        )
+        .ignoresSafeArea()
+    }
+
+    fileprivate var topBarLayer: some View {
+        VStack {
+            topBar
+            Spacer()
+        }
+        .padding()
+    }
+
+    @ViewBuilder
+    fileprivate var drawingPanelLayer: some View {
+        if appMode == .drawing {
+            GeometryReader { proxy in
+                DraggableAutoPanel(
+                    containerSize: proxy.size,
+                    width: 260,
+                    margin: 12,
+                    headerHeight: 44,
+                    position: $panelPos
+                ) {
+                    DrawingModePanelHeader(drawMode: drawMode)
+                        .padding(.horizontal, 12)
+                } content: {
+                    DrawingModePanel(
+                        drawMode: $drawMode,
+                        color: $color,
+                        lineWidth: $lineWidth,
+                        opacity: $opacity,
+                        eraserRadius: $eraserRadius,
+                        onUndo: { canvas?.undo() },
+                        onRedo: { canvas?.redo() },
+                        onClear: { canvas?.clear() },
+                        onSave: {}
+                    )
+                    .padding(.horizontal, 12)
+                }
+                .onAppear {
+                    guard !didInitPanelPos else { return }
+                    didInitPanelPos = true
+
+                    // 初期位置（右下寄せ）
+                    panelPos = CGPoint(
+                        x: proxy.size.width - 260 / 2 - 16,
+                        y: proxy.size.height - 120  // 高さは自動で伸びるので “だいたい” でOK
+                    )
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    fileprivate func initPanelPositionIfNeeded(in container: CGSize) {
+        guard !didInitPanelPos else { return }
+        didInitPanelPos = true
+
+        panelPos = CGPoint(
+            x: container.width - panelSize.width / 2 - 16,
+            y: container.height - panelSize.height / 2 - 24
+        )
+    }
+}
+
+// MARK: - UI
+
+extension ContentView {
+
+    fileprivate var topBar: some View {
         HStack(spacing: 12) {
 
             Button("Reset Zoom") {
@@ -54,79 +139,51 @@ private extension ContentView {
                 .foregroundStyle(.secondary)
 
             Spacer()
+
+            Button {
+                appMode = (appMode == .drawing) ? .normal : .drawing
+            } label: {
+                Text("描画")
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(appMode == .drawing ? Color.blue.opacity(0.25) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
         }
         .padding(10)
         .background(.ultraThinMaterial)
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
-private extension ContentView {
+// MARK: - Canvas sync
 
-    var bottomBar: some View {
-        VStack(spacing: 12) {
+extension ContentView {
 
-            // ==== Mode ====
-            HStack {
-                Button("Pen")   { mode = .pen }
-                Button("Stamp") { mode = .stamp }
-                Button("Erase") { mode = .eraser }
-            }
-
-            // ==== Color ====
-            ColorPicker("Color", selection: $color)
-                .labelsHidden()
-
-            // ==== Pen ====
-            if mode == .pen {
-                VStack {
-                    Slider(value: $lineWidth, in: 1...20) {
-                        Text("Line")
-                    }
-                    Slider(value: Binding(
-                        get: { Double(opacity) },
-                        set: { opacity = CGFloat($0) }
-                    ), in: 0.1...1.0) {
-                        Text("Opacity")
-                    }
-                }
-            }
-
-            // ==== Eraser ====
-            if mode == .eraser {
-                Slider(value: $eraserRadius, in: 6...60) {
-                    Text("Eraser")
-                }
-            }
-
-            // ==== Commands ====
-            HStack {
-                Button("Undo") { canvas?.undo() }
-                Button("Redo") { canvas?.redo() }
-                Button("Clear") { canvas?.clear() }
-            }
-        }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(16)
-        .onChange(of: mode) { _ in syncCanvas() }
-        .onChange(of: color) { _ in syncCanvas() }
-        .onChange(of: lineWidth) { _ in syncCanvas() }
-        .onChange(of: opacity) { _ in syncCanvas() }
-        .onChange(of: eraserRadius) { _ in syncCanvas() }
-    }
-
-    /// SwiftUI State → DrawingCanvasView へ反映
-    func syncCanvas() {
+    fileprivate func applyAppModeToCanvas() {
         guard let canvas else { return }
 
-        canvas.mode = mode
+        switch appMode {
+        case .drawing:
+            canvas.mode = drawMode
+        default:
+            canvas.mode = .none
+        }
+    }
+
+    fileprivate func syncCanvasToolState() {
+        guard let canvas else { return }
+        guard appMode == .drawing else { return }
+
+        canvas.mode = drawMode
 
         canvas.penStyle = PenStyle(
             color: UIColor(color),
             lineWidth: lineWidth,
             opacity: opacity
         )
+
         canvas.eraserRadius = eraserRadius
     }
 }
