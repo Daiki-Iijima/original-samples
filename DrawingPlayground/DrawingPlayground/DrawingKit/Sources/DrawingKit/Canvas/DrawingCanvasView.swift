@@ -19,6 +19,14 @@ public final class DrawingCanvasView: UIView {
             eraserPreviewLayer.lineWidth = max(1, eraserRadius * 2)
         }
     }
+    /// View座標 → “描画座標(=画像座標)” への変換（未設定ならそのままView座標）
+    public var viewPointToCanvasPoint: ((CGPoint) -> CGPoint?)?
+
+    /// “描画座標(=画像座標)” → View座標（表示用。コミット描画で使う）
+    public var canvasPointToViewPoint: ((CGPoint) -> CGPoint?)?
+    
+    /// view座標(pt) → canvas座標 へ変換するスケール（例: ズーム倍率）
+    public var viewToCanvasScale: CGFloat = 1.0
 
     // MARK: - State（重要：状態と履歴を分ける）
 
@@ -158,21 +166,23 @@ public final class DrawingCanvasView: UIView {
 
     @objc private func handleStampTap(_ g: UITapGestureRecognizer) {
         guard mode == .stamp else { return }
-        let p = g.location(in: self)
+        let pView = g.location(in: self)
+        let pCanvas = viewPointToCanvasPoint?(pView) ?? pView
 
-        let stamp = Stamp(kind: stampKind, center: p, style: stampStyle)
+        let stamp = Stamp(kind: stampKind, center: pCanvas, style: stampStyle)
         apply(.add(.stamp(stamp)), recordToHistory: true)
         redrawAllCommittedElements()
     }
 
     @objc private func handlePan(_ g: UIPanGestureRecognizer) {
-        let p = g.location(in: self)
+        let pView = g.location(in: self)
+        let pCanvas = viewPointToCanvasPoint?(pView) ?? pView
 
         switch mode {
         case .pen:
-            handlePenPan(g, point: p)
+            handlePenPan(g, point: pCanvas)
         case .eraser:
-            handleEraserPan(g, point: p)
+            handleEraserPan(g, point: pCanvas)
         default:
             break
         }
@@ -259,10 +269,14 @@ public final class DrawingCanvasView: UIView {
             return
         }
 
+        func toView(_ p: CGPoint) -> CGPoint {
+            canvasPointToViewPoint?(p) ?? p
+        }
+
         let path = UIBezierPath()
-        path.move(to: eraserPathPoints[0])
+        path.move(to: toView(eraserPathPoints[0]))
         for p in eraserPathPoints.dropFirst() {
-            path.addLine(to: p)
+            path.addLine(to: toView(p))
         }
         eraserPreviewLayer.path = path.cgPath
     }
@@ -271,7 +285,9 @@ public final class DrawingCanvasView: UIView {
     private func eraseHitTestAndApply(at p: CGPoint) {
         guard !elements.isEmpty else { return }
 
-        let r = eraserRadius
+        let scale = max(0.0001, viewToCanvasScale)
+        let r = eraserRadius / scale
+        
         var hitIndices: [Int] = []
 
         for (idx, el) in elements.enumerated() {
@@ -455,10 +471,15 @@ public final class DrawingCanvasView: UIView {
     }
 
     private func makePath(points: [CGPoint]) -> CGPath? {
-        guard let first = points.first else { return nil }
+        guard let firstRaw = points.first else { return nil }
+
+        func toView(_ p: CGPoint) -> CGPoint {
+            canvasPointToViewPoint?(p) ?? p
+        }
+
         let path = UIBezierPath()
-        path.move(to: first)
-        for p in points.dropFirst() { path.addLine(to: p) }
+        path.move(to: toView(firstRaw))
+        for p in points.dropFirst() { path.addLine(to: toView(p)) }
         return path.cgPath
     }
 }
