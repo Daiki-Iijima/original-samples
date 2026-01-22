@@ -16,11 +16,19 @@ struct ZoomableDrawingRepresentable: UIViewRepresentable {
     @Binding var viewportState: ViewportState
     @Binding var zoomRequest: ZoomRequest
 
+    let onTapImagePoint: (CGPoint) -> Void
+
     final class Coordinator {
         var lastIsDrawing: Bool?
+        weak var zoom: ZoomPanUIView?
+        var onTapImagePoint: ((CGPoint) -> Void)?
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator {
+        let c = Coordinator()
+        c.onTapImagePoint = onTapImagePoint
+        return c
+    }
 
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
@@ -33,6 +41,14 @@ struct ZoomableDrawingRepresentable: UIViewRepresentable {
         // --- Canvas (上) ---
         let canvas = DrawingCanvasView()
         canvas.backgroundColor = .clear
+
+        // Tap（1本指）を container で拾う
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap(_:))
+        )
+        tap.cancelsTouchesInView = false  // ← 描画/ズームを邪魔しない
+        container.addGestureRecognizer(tap)
 
         // Viewport 変化通知（高頻度）
         zoom.onViewportChanged = { [weak canvas] state in
@@ -74,6 +90,8 @@ struct ZoomableDrawingRepresentable: UIViewRepresentable {
 
         container.addSubview(zoom)
         container.addSubview(canvas)
+
+        context.coordinator.zoom = zoom
 
         DispatchQueue.main.async { self.canvasRef = canvas }
 
@@ -135,5 +153,22 @@ struct ZoomableDrawingRepresentable: UIViewRepresentable {
             canvas.isUserInteractionEnabled = false
             zoom.setOwnGesturesEnabled(true)
         }
+    }
+}
+
+extension ZoomableDrawingRepresentable.Coordinator {
+
+    @objc func handleTap(_ g: UITapGestureRecognizer) {
+        guard
+            let view = g.view,
+            let zoom = zoom
+        else { return }
+
+        let v = g.location(in: view)
+
+        // ✅ view → image 座標
+        let imagePoint = zoom.viewPointToImagePoint(v)!
+
+        onTapImagePoint?(imagePoint)
     }
 }

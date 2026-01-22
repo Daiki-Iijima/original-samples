@@ -36,14 +36,44 @@ struct ContentView: View {
     // overlay矩形（Undo不要の表示要素）
     @State private var overlayRects: [CanvasRect] = [
         CanvasRect(
+            externalID: "A-001",
+            name: "部品A",
+            isChecked: false,
+            isHidden: false,
             rect: CGRect(x: 100, y: 120, width: 220, height: 160),
             style: CanvasRectStyle(
-                strokeColor: .systemGreen,
+                strokeColor: .systemYellow,
                 strokeWidth: 3,
-                fill: .solid(UIColor.systemGreen.withAlphaComponent(0.15))
+                fill: .solid(UIColor.systemYellow.withAlphaComponent(0.15))
             )
-        )
+        ),
+        CanvasRect(
+            externalID: "B-002",
+            name: "部品B（確認済）",
+            isChecked: true,
+            isHidden: false,
+            rect: CGRect(x: 380, y: 140, width: 180, height: 120),
+            style: CanvasRectStyle(
+                strokeColor: .systemYellow,
+                strokeWidth: 3,
+                fill: .none
+            )
+        ),
+        CanvasRect(
+            externalID: "C-003",
+            name: "部品C（非表示）",
+            isChecked: false,
+            isHidden: true,
+            rect: CGRect(x: 160, y: 340, width: 200, height: 140),
+            style: CanvasRectStyle(
+                strokeColor: .systemYellow,
+                strokeWidth: 3,
+                fill: .none
+            )
+        ),
     ]
+
+    @State private var selectedRectIDs: Set<UUID> = []
 
     // 保存キー（画像と紐づく想定）
     @State private var imageKey: String = "sample1"
@@ -107,7 +137,10 @@ extension ContentView {
             ),
             canvasRef: $canvas,
             viewportState: $viewportState,
-            zoomRequest: $zoomRequest
+            zoomRequest: $zoomRequest,
+            onTapImagePoint: { p in
+                handleTapOnCanvas(at: p)
+            }
         )
     }
 
@@ -414,9 +447,41 @@ extension ContentView {
     }
 
     fileprivate func syncOverlayRects() {
-        // overlayは描画モードじゃなくても追従して欲しいので、
-        // canvasが生きてる限り毎回反映してOK
-        canvas?.setOverlayRects(overlayRects)
+        // 選択状態に応じて style を差し替えた配列を作って反映
+        let rectsForCanvas: [CanvasRect] = overlayRects.map { r in
+            if selectedRectIDs.contains(r.id) {
+                var s = r.style
+                s.strokeColor = .systemYellow
+                s.strokeWidth = max(s.strokeWidth, 5)
+                // fillはそのまま
+                return CanvasRect(id: r.id, rect: r.rect, style: s)
+            } else {
+                return r
+            }
+        }
+        canvas?.setOverlayRects(rectsForCanvas)
+    }
+
+    fileprivate func handleTapOnCanvas(at imagePoint: CGPoint) {
+        // 一番上（最後に追加されたRect）を優先して当てる
+        guard let hit = overlayRects.reversed().first(where: { $0.rect.contains(imagePoint) })
+        else {
+            // 何もないところをタップしたら全解除したいならここで
+            // selectedRectIDs.removeAll()
+            // syncOverlayRects()
+            return
+        }
+
+        if selectedRectIDs.contains(hit.id) {
+            selectedRectIDs.remove(hit.id)
+        } else {
+            selectedRectIDs.insert(hit.id)
+        }
+
+        syncOverlayRects()
+
+        // タップしたらRect一覧パネルを出す（要望通り）
+        interactionMode = .rectList
     }
 }
 
@@ -580,8 +645,8 @@ extension ContentView {
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 8)
                     } else {
-                        ForEach(Array(overlayRects.enumerated()), id: \.offset) { index, item in
-                            rectRow(index: index, rect: item.rect)
+                        ForEach(Array(overlayRects.enumerated()), id: \.element.id) { index, item in
+                            rectRow(index: index, rect: item)
                         }
                     }
                 }
@@ -592,38 +657,63 @@ extension ContentView {
     }
 
     @ViewBuilder
-    fileprivate func rectRow(index: Int, rect: CGRect) -> some View {
+    fileprivate func rectRow(index: Int, rect: CanvasRect) -> some View {
+        let isSelected = selectedRectIDs.contains(rect.id)
+
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("#\(index)")
+            HStack(alignment: .center, spacing: 8) {
+
+                // 🔹 name 表示（メイン）
+                Text(rect.name.isEmpty ? "（名称未設定）" : rect.name)
                     .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .lineLimit(1)
 
                 Spacer()
 
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.blue)
+                }
+
                 Button("Zoom") {
-                    let center = CGPoint(x: rect.midX, y: rect.midY)
-                    // とりあえず「中心へ寄せて少し拡大」
+                    let center = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
                     let targetScale = max(viewportState.scale, 2.0)
                     zoomRequest = .set(scale: targetScale, centerInImage: center)
                 }
 
                 Button(role: .destructive) {
-                    if overlayRects.indices.contains(index) {
-                        overlayRects.remove(at: index)
-                    }
+                    overlayRects.removeAll { $0.id == rect.id }
+                    selectedRectIDs.remove(rect.id)
                 } label: {
-                    Text("削除")
+                    Image(systemName: "trash")
                 }
             }
 
-            Text(rectSummary(rect))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // 🔹 サブ情報（業務ID + 座標）
+            HStack(spacing: 8) {
+                if let ext = rect.externalID {
+                    Text(ext)
+                }
+
+                Text(rectSummary(rect.rect))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
             Divider().opacity(0.2)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        // ✅ タップで選択切替（一覧からも操作できる）
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isSelected {
+                selectedRectIDs.remove(rect.id)
+            } else {
+                selectedRectIDs.insert(rect.id)
+            }
+            syncOverlayRects()
+        }
     }
 
     fileprivate func rectSummary(_ r: CGRect) -> String {
