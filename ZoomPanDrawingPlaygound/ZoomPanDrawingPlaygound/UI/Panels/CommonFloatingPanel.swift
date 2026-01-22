@@ -57,15 +57,19 @@ struct CommonFloatingPanel<Content: View>: View {
         // 共通：右上寄せ / 右下寄せ など “kindごと” に決める
         switch kind {
         case .drawing:
-            // 例：右下
             position = CGPoint(
                 x: containerSize.width - width / 2 - 16,
                 y: containerSize.height - 140
             )
         case .rectList:
-            // 例：右上
             position = CGPoint(
                 x: containerSize.width - width / 2 - 16,
+                y: 140
+            )
+        case .selection:
+            // 左上寄せ（rectListと被らない場所）
+            position = CGPoint(
+                x: width / 2 + 16,
                 y: 140
             )
         }
