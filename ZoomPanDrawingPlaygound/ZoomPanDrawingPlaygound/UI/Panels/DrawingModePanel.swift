@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DrawingModePanel: View {
     @Binding var drawMode: DrawMode
+    @Binding var stampKind: StampKind
 
     @Binding var color: Color
     @Binding var lineWidth: CGFloat
@@ -56,11 +57,15 @@ struct DrawingModePanel: View {
                 display: { String(format: "%.2f", $0) })
 
         case .stamp:
-            // まずは暫定で lineWidth を「サイズ扱い」にしてる（後で stampSize に置き換え推奨）
-            sliderRow(title: "サイズ", value: $lineWidth, range: 10...120, display: { "\(Int($0))" })
-            sliderRow(
-                title: "透明度", value: $opacity, range: 0.1...1.0,
-                display: { String(format: "%.2f", $0) })
+            stampKindRow
+
+            sliderRow(title: "サイズ", value: $lineWidth, range: 10...120) {
+                "\(Int($0))"
+            }
+
+            sliderRow(title: "透明度", value: $opacity, range: 0.1...1.0) {
+                String(format: "%.2f", $0)
+            }
 
         case .eraser:
             sliderRow(title: "半径", value: $eraserRadius, range: 6...60, display: { "\(Int($0))" })
@@ -110,6 +115,33 @@ struct DrawingModePanel: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Slider(value: value, in: range)
+        }
+    }
+
+    @ViewBuilder
+    private var stampKindRow: some View {
+        if drawMode == .stamp {
+            HStack(spacing: 10) {
+                stampButton(.check, label: "✓")
+                stampButton(.cross, label: "✕")
+                stampButton(.circle, label: "○")
+            }
+        }
+    }
+
+    private func stampButton(_ kind: StampKind, label: String) -> some View {
+        Button {
+            stampKind = kind
+        } label: {
+            Text(label)
+                .font(.system(size: 20, weight: .bold))
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(
+                            stampKind == kind
+                                ? Color.orange.opacity(0.25) : Color.gray.opacity(0.15))
+                )
         }
     }
 

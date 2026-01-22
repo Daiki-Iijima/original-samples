@@ -30,8 +30,6 @@ struct ZoomPanRepresentable: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIViewType, context: Context) {
-        uiView.isTwoFingerPanOnly = isTwoFingerPanOnly
-        
         switch zoomRequest {
         case .none:
             break
