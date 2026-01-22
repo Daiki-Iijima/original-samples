@@ -10,8 +10,8 @@ private struct ViewHeightKey: PreferenceKey {
     }
 }
 
-private extension View {
-    func readHeight(_ onChange: @escaping (CGFloat) -> Void) -> some View {
+extension View {
+    fileprivate func readHeight(_ onChange: @escaping (CGFloat) -> Void) -> some View {
         background(
             GeometryReader { proxy in
                 Color.clear
@@ -50,39 +50,36 @@ struct DraggableAutoPanel<Header: View, Content: View>: View {
 
     var body: some View {
         let panelSize = computedPanelSize()
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
 
-        VStack(spacing: 0) {
-            header()
-                .frame(height: headerHeight)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .gesture(dragGesture(panelSize: panelSize))
-                .background(.ultraThinMaterial)
-                .overlay(divider, alignment: .bottom)
+        ZStack {
+            // Materialは外側に1枚だけ
+            shape.fill(.ultraThinMaterial)
 
-            // スクロールしない：中身をそのまま表示して高さを測る
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
-                .readHeight { h in
-                    // 連続更新の揺れを減らすため、少しだけ丸める（任意）
-                    let rounded = (h * 2).rounded() / 2
-                    if abs(contentHeight - rounded) > 0.5 {
-                        contentHeight = rounded
+            VStack(spacing: 0) {
+                header()
+                    .frame(height: headerHeight)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture(panelSize: panelSize))
+                    .overlay(divider, alignment: .bottom)
+
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .readHeight { h in
+                        let rounded = (h * 2).rounded() / 2
+                        if abs(contentHeight - rounded) > 0.5 {
+                            contentHeight = rounded
+                        }
                     }
-                }
-                .background(.ultraThinMaterial)
+            }
         }
         .frame(width: panelSize.width, height: panelSize.height)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(.white.opacity(0.15), lineWidth: 1)
-        )
-        // ドラッグ中は position を変えず、offsetで追従（超重要）
+        .clipShape(shape)  // これで上下も完全に枠と一致
+        .overlay(shape.stroke(.white.opacity(0.15), lineWidth: 1))
         .position(position)
         .offset(dragOffset)
-        // サイズが変わったら、画面外に出ないように位置を補正
         .onChange(of: panelSize.height) { _ in
             position = clamp(position, panelSize: panelSize)
         }
@@ -126,7 +123,7 @@ struct DraggableAutoPanel<Header: View, Content: View>: View {
         let halfW = panelSize.width / 2
         let halfH = panelSize.height / 2
 
-        x = max(margin + halfW, min(containerSize.width  - margin - halfW, x))
+        x = max(margin + halfW, min(containerSize.width - margin - halfW, x))
         y = max(margin + halfH, min(containerSize.height - margin - halfH, y))
 
         return CGPoint(x: x, y: y)

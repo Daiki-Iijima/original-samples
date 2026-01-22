@@ -259,4 +259,26 @@ final class ZoomPanUIView: UIView, UIGestureRecognizerDelegate {
             height: maxY - minY
         )
     }
+
+    public func viewLengthToImageLength(_ viewLen: CGFloat) -> CGFloat {
+        guard let image = imageView.image else { return viewLen }
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return viewLen }
+
+        let s = max(0.0001, viewportState.scale)  // 現在のズーム倍率
+        let kx = (image.size.width / drawRect.width) * (1.0 / s)
+        let ky = (image.size.height / drawRect.height) * (1.0 / s)
+        return viewLen * min(kx, ky)
+    }
+
+    public func imageLengthToViewLength(_ imageLen: CGFloat) -> CGFloat {
+        guard let image = imageView.image else { return imageLen }
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return imageLen }
+
+        let s = max(0.0001, viewportState.scale)
+        let kx = (drawRect.width / image.size.width) * s
+        let ky = (drawRect.height / image.size.height) * s
+        return imageLen * min(kx, ky)
+    }
 }

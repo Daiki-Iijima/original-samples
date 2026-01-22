@@ -58,6 +58,13 @@ struct ZoomableDrawingRepresentable: UIViewRepresentable {
             zoom?.handleExternalPinch(g)
         }
 
+        canvas.viewLengthToCanvasLength = { [weak zoom] viewLen in
+            zoom?.viewLengthToImageLength(viewLen) ?? viewLen
+        }
+        canvas.canvasLengthToViewLength = { [weak zoom] imageLen in
+            zoom?.imageLengthToViewLength(imageLen) ?? imageLen
+        }
+
         // レイアウト
         zoom.frame = container.bounds
         zoom.autoresizingMask = [.flexibleWidth, .flexibleHeight]

@@ -22,6 +22,12 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         }
     }
 
+    /// View長さ(pt) → canvas長さ(=画像座標)
+    public var viewLengthToCanvasLength: ((CGFloat) -> CGFloat)?
+
+    /// canvas長さ(=画像座標) → View長さ(pt)（表示用）
+    public var canvasLengthToViewLength: ((CGFloat) -> CGFloat)?
+
     /// View座標 → “描画座標(=画像座標)” への変換（未設定ならそのままView座標）
     public var viewPointToCanvasPoint: ((CGPoint) -> CGPoint?)?
 
@@ -353,6 +359,95 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         redrawCommittedElements()
     }
 
+    public func exportMergedImage(baseImage: UIImage) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = baseImage.scale  // ★元画像と同じ scale
+        format.opaque = false
+
+        let size = baseImage.size  // ★元画像と同じ size（ポイント表現だけどOK）
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+
+        return renderer.image { ctx in
+            // 1) 元画像
+            baseImage.draw(in: CGRect(origin: .zero, size: size))
+
+            // 2) ペン＆スタンプ（画像座標で描く）
+            for el in elements {
+                switch el {
+                case .stroke(let s):
+                    drawStrokeForExport(s, in: ctx.cgContext)
+                case .stamp(let s):
+                    drawStampForExport(s, in: ctx.cgContext)
+                }
+            }
+
+            // 3) 必要なら overlayRects も合成（欲しければON）
+            // drawOverlayRectsForExport(in: ctx.cgContext)
+        }
+    }
+
+    private func drawStrokeForExport(_ stroke: Stroke, in cg: CGContext) {
+        guard stroke.points.count >= 2 else { return }
+
+        cg.saveGState()
+        defer { cg.restoreGState() }
+
+        cg.setLineCap(.round)
+        cg.setLineJoin(.round)
+        cg.setStrokeColor(stroke.style.color.withAlphaComponent(stroke.style.opacity).cgColor)
+        cg.setLineWidth(stroke.style.lineWidth)  // ★画像座標の太さ
+
+        cg.beginPath()
+        cg.move(to: stroke.points[0])
+        for p in stroke.points.dropFirst() {
+            cg.addLine(to: p)
+        }
+        cg.strokePath()
+    }
+
+    private func drawStampForExport(_ stamp: Stamp, in cg: CGContext) {
+        cg.saveGState()
+        defer { cg.restoreGState() }
+
+        let color = stamp.style.color.withAlphaComponent(stamp.style.opacity).cgColor
+        cg.setStrokeColor(color)
+        cg.setLineWidth(max(2, stamp.style.size * 0.12))  // ★画像座標のサイズ
+
+        let c = stamp.center
+        let s = stamp.style.size
+
+        switch stamp.kind {
+        case .check:
+            let p1 = CGPoint(x: c.x - s * 0.30, y: c.y + s * 0.05)
+            let p2 = CGPoint(x: c.x - s * 0.10, y: c.y + s * 0.25)
+            let p3 = CGPoint(x: c.x + s * 0.35, y: c.y - s * 0.20)
+
+            cg.beginPath()
+            cg.move(to: p1)
+            cg.addLine(to: p2)
+            cg.addLine(to: p3)
+            cg.strokePath()
+
+        case .cross:
+            let a = CGPoint(x: c.x - s * 0.30, y: c.y - s * 0.30)
+            let b = CGPoint(x: c.x + s * 0.30, y: c.y + s * 0.30)
+            let d = CGPoint(x: c.x + s * 0.30, y: c.y - s * 0.30)
+            let e = CGPoint(x: c.x - s * 0.30, y: c.y + s * 0.30)
+
+            cg.beginPath()
+            cg.move(to: a)
+            cg.addLine(to: b)
+            cg.move(to: d)
+            cg.addLine(to: e)
+            cg.strokePath()
+
+        case .circle:
+            let rect = CGRect(
+                x: c.x - s * 0.35, y: c.y - s * 0.35, width: s * 0.70, height: s * 0.70)
+            cg.strokeEllipse(in: rect)
+        }
+    }
+
     // =========================================================
     // MARK: - Input (1 finger)
     // =========================================================
@@ -363,7 +458,12 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         let pView = g.location(in: self)
         let pCanvas = viewPointToCanvasPoint?(pView) ?? pView
 
-        let stamp = Stamp(kind: stampKind, center: pCanvas, style: stampStyle)
+        var st = stampStyle
+        if let conv = viewLengthToCanvasLength {
+            st.size = conv(stampStyle.size)
+        }
+        let stamp = Stamp(kind: stampKind, center: pCanvas, style: st)
+
         apply(.add(.stamp(stamp)), recordToHistory: true)
 
         // ✅ ちらつき対策：確定時に全再描画しない（差分で1枚追加）
@@ -414,7 +514,11 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
 
         case .ended, .cancelled, .failed:
             if currentPoints.count >= 2 {
-                let stroke = Stroke(points: currentPoints, style: penStyle)
+                var style = penStyle
+                if let conv = viewLengthToCanvasLength {
+                    style.lineWidth = conv(penStyle.lineWidth)
+                }
+                let stroke = Stroke(points: currentPoints, style: style)
                 apply(.add(.stroke(stroke)), recordToHistory: true)
 
                 // ✅ ちらつき対策：確定時に全再描画しない（差分で1枚追加）
@@ -648,12 +752,16 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         let l = CAShapeLayer()
         l.fillColor = UIColor.clear.cgColor
         l.strokeColor = stroke.style.color.withAlphaComponent(stroke.style.opacity).cgColor
-        l.lineWidth = stroke.style.lineWidth
+
+        // 画像座標で保存している lineWidth を View(pt) に戻す
+        let wView: CGFloat =
+            canvasLengthToViewLength?(stroke.style.lineWidth) ?? stroke.style.lineWidth
+        l.lineWidth = wView
+
         l.lineCap = .round
         l.lineJoin = .round
         l.path = makePath(points: stroke.points)
         l.actions = ["path": NSNull(), "strokeColor": NSNull(), "lineWidth": NSNull()]
-
         committedContainerLayer.addSublayer(l)
     }
 
@@ -661,14 +769,17 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         let l = CAShapeLayer()
         l.fillColor = UIColor.clear.cgColor
         l.strokeColor = stamp.style.color.withAlphaComponent(stamp.style.opacity).cgColor
-        l.lineWidth = max(2, stamp.style.size * 0.12)
+
+        let sView: CGFloat = canvasLengthToViewLength?(stamp.style.size) ?? stamp.style.size
+        l.lineWidth = max(2, sView * 0.12)
+
         l.lineCap = .round
         l.lineJoin = .round
         l.actions = ["path": NSNull(), "strokeColor": NSNull(), "lineWidth": NSNull()]
 
         let c = canvasPointToViewPoint?(stamp.center) ?? stamp.center
         let path = UIBezierPath()
-        let s = stamp.style.size
+        let s = sView
 
         switch stamp.kind {
         case .check:
