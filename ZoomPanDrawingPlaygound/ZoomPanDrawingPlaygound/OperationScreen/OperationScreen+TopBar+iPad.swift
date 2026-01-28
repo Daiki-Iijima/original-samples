@@ -1,3 +1,4 @@
+import DrawingKit
 import SwiftUI
 
 extension OperationScreen {
@@ -12,38 +13,15 @@ extension OperationScreen {
 
     var topBar: some View {
         VStack(spacing: 10) {
-
             HStack(spacing: 10) {
-
-                if interactionMode != .normal {
-                    Button {
-                        emphasizeNormalMode()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.headline)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                    }
-                    .background(Color.black.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-
                 modeButton("Normal", .normal)
                 modeButton("描画", .drawing)
                 modeButton("Zoom指定", .zoomPreset)
                 modeButton("Rect追加", .rectPreset)
-                Button {
-                    isRectListVisible.toggle()
-                } label: {
-                    Text("Rect一覧")
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(isRectListVisible ? Color.blue.opacity(0.25) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
 
                 Spacer()
+
+                Button("Rect一覧") { isRectListVisible.toggle() }
 
                 Button("Reset Zoom") { zoomRequest = .reset }
 
@@ -85,10 +63,5 @@ extension OperationScreen {
                 .background(interactionMode == mode ? Color.blue.opacity(0.25) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-    }
-
-    /// Normal に戻るときの共通処理（お好みでここを増やせる）
-    func emphasizeNormalMode() {
-        interactionMode = .normal
     }
 }

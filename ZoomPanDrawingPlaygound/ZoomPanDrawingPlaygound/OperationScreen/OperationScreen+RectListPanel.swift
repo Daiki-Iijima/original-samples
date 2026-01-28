@@ -13,10 +13,6 @@ extension OperationScreen {
 
                 Spacer()
 
-                Button("全解除") {
-                    selectedRectIDs.removeAll()
-                }
-
                 Button("全部クリア") {
                     overlayRects.removeAll()
                     selectedRectIDs.removeAll()
@@ -25,7 +21,6 @@ extension OperationScreen {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-
                     if overlayRects.isEmpty {
                         Text("Rectがありません")
                             .foregroundStyle(.secondary)
@@ -45,37 +40,38 @@ extension OperationScreen {
     @ViewBuilder
     func rectRow(index: Int, rect: CanvasRect) -> some View {
         let isSelected = selectedRectIDs.contains(rect.id)
+        let isDisabled = rect.isHidden || rect.isChecked
 
         VStack(alignment: .leading, spacing: 6) {
-
             HStack(alignment: .center, spacing: 8) {
 
-                // name（メイン）
                 Text(rect.name.isEmpty ? "（名称未設定）" : rect.name)
                     .font(.subheadline)
                     .fontWeight(isSelected ? .bold : .regular)
                     .lineLimit(1)
-                    .opacity(rect.isHidden ? 0.4 : 1.0)
+                    .opacity(isDisabled ? 0.45 : 1.0)
 
-                if rect.isChecked {
-                    Text("✓")
-                        .font(.caption)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.2))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
+                Spacer()
 
                 if rect.isHidden {
                     Text("非表示")
-                        .font(.caption)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.gray.opacity(0.2))
+                        .padding(.vertical, 3)
+                        .background(.thinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
 
-                Spacer()
+                if rect.isChecked {
+                    Text("確認済")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
@@ -96,24 +92,34 @@ extension OperationScreen {
                 }
             }
 
-            // サブ情報（外部ID + 座標）
             HStack(spacing: 8) {
                 if let ext = rect.externalID {
                     Text(ext)
                 }
-
                 Text(rectSummary(rect.rect))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            // ✅ 一覧側操作（表示/チェックのトグルを入れたいならここに追加しやすい）
+            HStack(spacing: 10) {
+                Button(rect.isHidden ? "表示" : "非表示") {
+                    toggleHidden(rectID: rect.id)
+                }
+                Button(rect.isChecked ? "未確認" : "確認済") {
+                    toggleChecked(rectID: rect.id)
+                }
+                Spacer()
+            }
+            .font(.caption.weight(.semibold))
+
             Divider().opacity(0.2)
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
-        // ✅ 非表示・チェック済みはタップ無効にしたいならここで弾く
         .onTapGesture {
-            guard !rect.isHidden && !rect.isChecked else { return }
+            // ✅ 非表示/確認済はタップで選択させない
+            guard !isDisabled else { return }
 
             if isSelected {
                 selectedRectIDs.remove(rect.id)
@@ -127,5 +133,27 @@ extension OperationScreen {
         String(
             format: "x: %.1f  y: %.1f  w: %.1f  h: %.1f",
             r.origin.x, r.origin.y, r.size.width, r.size.height)
+    }
+
+    // MARK: - list operations
+
+    func toggleHidden(rectID: UUID) {
+        guard let idx = overlayRects.firstIndex(where: { $0.id == rectID }) else { return }
+        overlayRects[idx].isHidden.toggle()
+
+        // 非表示にしたら選択も解除（仕様）
+        if overlayRects[idx].isHidden {
+            selectedRectIDs.remove(rectID)
+        }
+    }
+
+    func toggleChecked(rectID: UUID) {
+        guard let idx = overlayRects.firstIndex(where: { $0.id == rectID }) else { return }
+        overlayRects[idx].isChecked.toggle()
+
+        // 確認済にしたら選択も解除（仕様）
+        if overlayRects[idx].isChecked {
+            selectedRectIDs.remove(rectID)
+        }
     }
 }

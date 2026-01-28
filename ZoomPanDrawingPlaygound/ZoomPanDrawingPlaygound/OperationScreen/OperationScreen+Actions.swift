@@ -37,31 +37,8 @@ extension OperationScreen {
         } catch {
             print("❌ load failed:", error)
         }
-    }
 
-    func appendOverlayRectFromPreset() {
-        let rect = CGRect(
-            x: rectPreset.centerX - rectPreset.width * 0.5,
-            y: rectPreset.centerY - rectPreset.height * 0.5,
-            width: rectPreset.width,
-            height: rectPreset.height
-        )
-
-        let style = CanvasRectStyle(
-            strokeColor: .systemGreen,
-            strokeWidth: 3,
-            fill: .solid(UIColor.systemGreen.withAlphaComponent(0.15))
-        )
-
-        overlayRects.append(
-            CanvasRect(
-                externalID: nil,
-                name: "新規Rect",
-                isChecked: false,
-                isHidden: false,
-                rect: rect,
-                style: style
-            )
-        )
+        // overlay も反映
+        syncOverlayRects()
     }
 }

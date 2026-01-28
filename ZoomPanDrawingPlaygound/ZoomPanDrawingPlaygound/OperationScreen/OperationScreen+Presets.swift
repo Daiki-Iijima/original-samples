@@ -1,27 +1,28 @@
+import DrawingKit
 import SwiftUI
-
-struct ZoomPreset: Equatable {
-    var centerX: CGFloat
-    var centerY: CGFloat
-    var scale: CGFloat
-}
-
-struct RectPreset: Equatable {
-    var centerX: CGFloat
-    var centerY: CGFloat
-    var width: CGFloat
-    var height: CGFloat
-}
+import UIKit
 
 extension OperationScreen {
 
+    @ViewBuilder
+    var modePanelLayer: some View {
+        if interactionMode == .zoomPreset {
+            VStack {
+                zoomPresetPanel
+                Spacer()
+            }.padding()
+        } else if interactionMode == .rectPreset {
+            VStack {
+                rectPresetPanel
+                Spacer()
+            }.padding()
+        }
+    }
+
     var zoomPresetPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-
             HStack {
-                Text("Zoom指定（画像座標）")
-                    .font(.headline)
-
+                Text("Zoom指定（画像座標）").font(.headline)
                 Spacer()
                 Button("閉じる") { interactionMode = .normal }
             }
@@ -55,11 +56,8 @@ extension OperationScreen {
 
     var rectPresetPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-
             HStack {
-                Text("矩形追加（overlay / 画像座標）")
-                    .font(.headline)
-
+                Text("矩形追加（overlay / 画像座標）").font(.headline)
                 Spacer()
                 Button("閉じる") { interactionMode = .normal }
             }
@@ -76,7 +74,10 @@ extension OperationScreen {
 
             HStack {
                 Button("矩形を追加") { appendOverlayRectFromPreset() }
-                Button("全部クリア") { overlayRects.removeAll() }
+                Button("全部クリア") {
+                    overlayRects.removeAll()
+                    selectedRectIDs.removeAll()
+                }
                 Spacer()
             }
         }
@@ -85,10 +86,35 @@ extension OperationScreen {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
+    func appendOverlayRectFromPreset() {
+        let rect = CGRect(
+            x: rectPreset.centerX - rectPreset.width * 0.5,
+            y: rectPreset.centerY - rectPreset.height * 0.5,
+            width: rectPreset.width,
+            height: rectPreset.height
+        )
+
+        let style = CanvasRectStyle(
+            strokeColor: .systemYellow,
+            strokeWidth: 3,
+            fill: .solid(UIColor.systemYellow.withAlphaComponent(0.15))
+        )
+
+        overlayRects.append(
+            CanvasRect(
+                externalID: nil,
+                name: "新規Rect",
+                isChecked: false,
+                isHidden: false,
+                rect: rect,
+                style: style
+            )
+        )
+    }
+
     func numberField(_ title: String, value: Binding<CGFloat>, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-
             TextField(
                 title,
                 text: Binding(

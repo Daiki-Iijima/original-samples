@@ -4,7 +4,6 @@ import UIKit
 
 extension OperationScreen {
 
-    // 下層：画像 + ズームパン + 描画キャンバス
     var canvasLayer: some View {
         ZoomableDrawingRepresentable(
             image: UIImage(named: "sample1")!,
@@ -23,7 +22,6 @@ extension OperationScreen {
 
     func applyInteractionModeToCanvas() {
         guard let canvas else { return }
-
         switch interactionMode {
         case .drawing:
             canvas.mode = drawingSettings.tool
@@ -34,11 +32,7 @@ extension OperationScreen {
 
     func syncCanvasToolState() {
         guard let canvas else { return }
-        guard interactionMode == .drawing else {
-            // drawing 以外でも overlay は反映しておく
-            canvas.setOverlayRects(overlayRects)
-            return
-        }
+        guard interactionMode == .drawing else { return }
 
         canvas.mode = drawingSettings.tool
 
@@ -56,42 +50,46 @@ extension OperationScreen {
             size: drawingSettings.stamp.size,
             opacity: drawingSettings.stamp.opacity
         )
-
-        canvas.setOverlayRects(overlayRects)
     }
 
-    /// 選択状態 / 非表示 / チェック状態を加味して canvas に渡す
+    /// ✅ overlayRects / selectedRectIDs / isHidden / isChecked を加味して Canvas に反映
     func syncOverlayRects() {
-        // ✅ 非表示は描画しない（= タップ対象にもならないよう、hitTest側も同じ条件で弾く）
-        let visibleRects = overlayRects.filter { !$0.isHidden && !$0.isChecked }
+        guard let canvas else { return }
 
-        // ✅ 選択中は強調（style差し替え）
-        let rectsForCanvas: [CanvasRect] = visibleRects.map { r in
-            guard selectedRectIDs.contains(r.id) else { return r }
+        // 1) 描画対象（非表示は描かない・タップも効かせない）
+        let renderable = overlayRects.filter { !$0.isHidden && !$0.isChecked }
 
-            var rr = r
-            rr.style.strokeColor = .systemCyan
-            rr.style.strokeWidth = max(rr.style.strokeWidth, 5)
-
-            // ついでに薄く塗りを足す（お好み）
-            if case .none = rr.style.fill {
-                rr.style.fill = .solid(UIColor.systemCyan.withAlphaComponent(0.10))
+        // 2) 選択状態の見た目だけ強調
+        let rectsForCanvas: [CanvasRect] = renderable.map { r in
+            if selectedRectIDs.contains(r.id) {
+                var s = r.style
+                s.strokeWidth = max(s.strokeWidth, 5)
+                // 色は好み。ここでは “選択＝青” 例
+                s.strokeColor = .systemBlue
+                return CanvasRect(
+                    id: r.id,
+                    externalID: r.externalID,
+                    name: r.name,
+                    isChecked: r.isChecked,
+                    isHidden: r.isHidden,
+                    rect: r.rect,
+                    style: s
+                )
+            } else {
+                return r
             }
-            return rr
         }
 
-        canvas?.setOverlayRects(rectsForCanvas)
+        canvas.setOverlayRects(rectsForCanvas)
     }
 
-    /// 画像座標のタップ位置から、Rectを選択/解除
+    /// ✅ 画像座標でヒットテスト → 選択トグル
+    /// - 非表示(isHidden)はヒット対象から除外（タップ無効化）
+    /// - チェック済み(isChecked)もヒット対象から除外（仕様：一覧にも出すがタップ対象外）
     func handleTapOnCanvas(at imagePoint: CGPoint) {
-        // ✅ 非表示・チェック済みは「タップ対象にしない」
-        let hitCandidates =
-            overlayRects
-            .filter { !$0.isHidden && !$0.isChecked }
-            .reversed()
+        let tappable = overlayRects.filter { !$0.isHidden && !$0.isChecked }
 
-        guard let hit = hitCandidates.first(where: { $0.rect.contains(imagePoint) }) else {
+        guard let hit = tappable.reversed().first(where: { $0.rect.contains(imagePoint) }) else {
             return
         }
 
@@ -99,6 +97,11 @@ extension OperationScreen {
             selectedRectIDs.remove(hit.id)
         } else {
             selectedRectIDs.insert(hit.id)
+        }
+
+        // タップしたら「一覧表示」は欲しいが、別機能として維持（iPadはパネル、iPhoneはsheet）
+        if isPhoneLayout {
+        } else {
         }
     }
 }
