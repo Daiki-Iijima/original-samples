@@ -80,7 +80,7 @@ struct DraggableAutoPanel<Header: View, Content: View>: View {
         .overlay(shape.stroke(.white.opacity(0.15), lineWidth: 1))
         .position(position)
         .offset(dragOffset)
-        .onChange(of: panelSize.height) { _ in
+        .onChange(of: panelSize.height) {
             position = clamp(position, panelSize: panelSize)
         }
     }

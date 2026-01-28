@@ -285,9 +285,22 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         }
     }
 
-    public func exportImage(scale: CGFloat = UIScreen.main.scale) -> UIImage {
+    public func exportImage(scale: CGFloat? = nil) -> UIImage {
+        let resolvedScale: CGFloat = {
+            if let scale {
+                return scale
+            }
+
+            if let screenScale = window?.windowScene?.screen.scale {
+                return screenScale
+            }
+
+            return traitCollection.displayScale
+        }()
+
         let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
+        format.scale = resolvedScale
+
         let renderer = UIGraphicsImageRenderer(bounds: bounds, format: format)
         return renderer.image { ctx in
             layer.render(in: ctx.cgContext)
@@ -589,27 +602,34 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         }
     }
 
+    
     private func updateEraserStrokePreview() {
-        withoutImplicitAnimations {
-            eraserPreviewLayer.lineWidth = max(1, eraserRadius * 2)
+        Task { @MainActor in
+            // MainActor 上で一度だけ取り出す
+            let converter = self.canvasPointToViewPoint
 
-            guard eraserPathPoints.count >= 2 else {
-                eraserPreviewLayer.path = nil
-                return
-            }
+            withoutImplicitAnimations {
+                self.eraserPreviewLayer.lineWidth = max(1, self.eraserRadius * 2)
 
-            func toView(_ p: CGPoint) -> CGPoint {
-                canvasPointToViewPoint?(p) ?? p
-            }
+                guard self.eraserPathPoints.count >= 2 else {
+                    self.eraserPreviewLayer.path = nil
+                    return
+                }
 
-            let path = UIBezierPath()
-            path.move(to: toView(eraserPathPoints[0]))
-            for p in eraserPathPoints.dropFirst() {
-                path.addLine(to: toView(p))
+                func toView(_ p: CGPoint) -> CGPoint {
+                    converter?(p) ?? p
+                }
+
+                let path = UIBezierPath()
+                path.move(to: toView(self.eraserPathPoints[0]))
+                for p in self.eraserPathPoints.dropFirst() {
+                    path.addLine(to: toView(p))
+                }
+                self.eraserPreviewLayer.path = path.cgPath
             }
-            eraserPreviewLayer.path = path.cgPath
         }
     }
+
 
     /// ヒットした要素を“その場で消す”（リアルタイム）
     private func eraseHitTestAndApply(at p: CGPoint) {

@@ -6,7 +6,7 @@ extension OperationScreen {
 
     func saveMergedToPhotos() {
         guard let canvas else { return }
-        guard let base = UIImage(named: "sample1") else { return }
+        guard let base = UIImage(named: "sample2") else { return }
         let merged = canvas.exportMergedImage(baseImage: base)
         UIImageWriteToSavedPhotosAlbum(merged, nil, nil, nil)
     }

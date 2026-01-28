@@ -42,13 +42,6 @@ extension OperationScreen {
                         Label("一覧", systemImage: "square.stack")
                     }
 
-                    Button {
-                        presentedPanel = .selection
-                    } label: {
-                        Label("選択(\(selectedRectIDs.count))", systemImage: "checkmark.circle")
-                    }
-                    .disabled(selectedRectIDs.isEmpty)
-
                     Spacer()
 
                     Button {
@@ -91,11 +84,22 @@ extension OperationScreen {
                 .padding(.vertical, 12)
                 .presentationDetents([.medium, .large])
 
-        case .selection:
-            selectedRectPanelContent
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .presentationDetents([.medium, .large])
+        case .unconfirmedParts:
+            UnconfirmedPartsPanelView(
+                rects: overlayRects.filter { !$0.isHidden && !$0.isChecked },
+                selectedRectIDs: $selectedRectIDs,
+                onZoom: { rect in
+                    let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
+                    zoomRequest = .set(
+                        scale: max(viewportState.scale, 2.0),
+                        centerInImage: c
+                    )
+                },
+                onCameraCheckback: { selectedRects in
+                    print("camera checkback selected:", selectedRects.count)
+                }
+            )
+            .presentationDetents([.large])
         }
     }
 }

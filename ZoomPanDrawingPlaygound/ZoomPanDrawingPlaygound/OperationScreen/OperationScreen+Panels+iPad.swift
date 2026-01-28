@@ -60,28 +60,44 @@ extension OperationScreen {
             .ignoresSafeArea()
         }
     }
-
+    
     @ViewBuilder
-    var selectedRectPanelLayer: some View {
-        if !selectedRectIDs.isEmpty {
+    var unconfirmedPartsPanelLayer: some View {
+        if isUnconfirmedPartsVisible {
             GeometryReader { proxy in
                 CommonFloatingPanel(
-                    kind: .selection,
+                    kind: .rectList, // 専用kindが無いなら一旦これでOK（できれば .unconfirmed を増やす）
                     containerSize: proxy.size,
-                    width: selectionPanelWidth,
+                    width: unconfirmedPartsPanelWidth,
                     margin: 12,
                     headerHeight: 44,
-                    title: "選択中",
-                    onClose: { selectedRectIDs.removeAll() },
+                    title: "未確認部材一覧",
+                    onClose: { isUnconfirmedPartsVisible = false },
                     trailing: { AnyView(EmptyView()) },
-                    position: $selectionPanelPos,
-                    didInitPosition: $didInitSelectionPanelPos
+                    position: $unconfirmedPartsPanelPos ,
+                    didInitPosition: $didInitUnconfirmedPartsPanelPos
                 ) {
-                    selectedRectPanelContent
-                        .padding(.horizontal, 12)
+                    UnconfirmedPartsPanelView(
+                        rects: overlayRects.filter { !$0.isHidden && !$0.isChecked },
+                        selectedRectIDs: $selectedRectIDs,
+                        onZoom: { rect in
+                            let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
+                            zoomRequest = .set(
+                                scale: max(viewportState.scale, 2.0),
+                                centerInImage: c
+                            )
+                        },
+                        onCameraCheckback: { selectedRects in
+                            print("camera checkback selected:", selectedRects.count)
+                        }
+                    )
+                    .frame(
+                        minHeight: proxy.size.height * 2.0 / 3.0
+                    )
                 }
             }
             .ignoresSafeArea()
         }
     }
+
 }

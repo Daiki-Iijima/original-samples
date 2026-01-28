@@ -14,7 +14,7 @@ enum InteractionMode: Equatable {
 enum PanelRoute: String, Identifiable {
     case drawing
     case rectList
-    case selection
+    case unconfirmedParts //    未選択部材一覧パネル
 
     var id: String { rawValue }
 }
@@ -33,42 +33,51 @@ struct RectPreset: Equatable {
 }
 
 enum SampleData {
-    static let overlayRects: [CanvasRect] = [
-        CanvasRect(
-            externalID: "A-001",
-            name: "部品A",
-            isChecked: false,
-            isHidden: false,
-            rect: CGRect(x: 100, y: 120, width: 220, height: 160),
-            style: CanvasRectStyle(
-                strokeColor: .systemYellow,
-                strokeWidth: 3,
-                fill: .solid(UIColor.systemYellow.withAlphaComponent(0.15))
-            )
-        ),
-        CanvasRect(
-            externalID: "B-002",
-            name: "部品B（確認済）",
-            isChecked: true,
-            isHidden: false,
-            rect: CGRect(x: 380, y: 140, width: 180, height: 120),
-            style: CanvasRectStyle(
-                strokeColor: .systemYellow,
-                strokeWidth: 3,
-                fill: .none
-            )
-        ),
-        CanvasRect(
-            externalID: "C-003",
-            name: "部品C（非表示）",
-            isChecked: false,
-            isHidden: true,
-            rect: CGRect(x: 160, y: 340, width: 200, height: 140),
-            style: CanvasRectStyle(
-                strokeColor: .systemYellow,
-                strokeWidth: 3,
-                fill: .none
-            )
-        ),
-    ]
+
+    static let overlayRects: [CanvasRect] = {
+        var rects: [CanvasRect] = []
+
+        let startX: CGFloat = 80
+        let startY: CGFloat = 80
+        let stepX: CGFloat = 140
+        let stepY: CGFloat = 120
+
+        let sizeRange: ClosedRange<CGFloat> = 60...110
+
+        var index = 1
+
+        for row in 0..<4 {
+            for col in 0..<5 {
+
+                let w = CGFloat.random(in: sizeRange)
+                let h = CGFloat.random(in: sizeRange)
+
+                let x = startX + CGFloat(col) * stepX + CGFloat.random(in: -10...10)
+                let y = startY + CGFloat(row) * stepY + CGFloat.random(in: -10...10)
+
+                let isChecked = index % 7 == 0      // たまに確認済
+                let isHidden  = index % 11 == 0     // たまに非表示
+
+                let rect = CanvasRect(
+                    externalID: String(format: "P-%03d", index),
+                    name: "部品\(index)",
+                    isChecked: isChecked,
+                    isHidden: isHidden,
+                    rect: CGRect(x: x, y: y, width: w, height: h),
+                    style: CanvasRectStyle(
+                        strokeColor: .systemYellow,
+                        strokeWidth: 2,
+                        fill: isChecked
+                            ? .none
+                            : .solid(UIColor.systemYellow.withAlphaComponent(0.12))
+                    )
+                )
+
+                rects.append(rect)
+                index += 1
+            }
+        }
+
+        return rects
+    }()
 }

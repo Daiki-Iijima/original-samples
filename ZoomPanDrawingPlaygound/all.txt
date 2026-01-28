@@ -228,77 +228,6 @@ extension OperationScreen {
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+TopBar+iPad.swift
-----------------------------------------
-import DrawingKit
-import SwiftUI
-
-extension OperationScreen {
-
-    var topBarLayer: some View {
-        VStack {
-            topBar
-            Spacer()
-        }
-        .padding()
-    }
-
-    var topBar: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                modeButton("Normal", .normal)
-                modeButton("描画", .drawing)
-                modeButton("Zoom指定", .zoomPreset)
-                modeButton("Rect追加", .rectPreset)
-
-                Spacer()
-
-                Button("Rect一覧") { isRectListVisible.toggle() }
-
-                Button("Reset Zoom") { zoomRequest = .reset }
-
-                Text(String(format: "scale: %.2f", viewportState.scale))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 10) {
-                TextField("imageKey", text: $imageKey)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 140)
-
-                TextField("drawingKey", text: $drawingKey)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 120)
-
-                Button("Save(Local)") { saveDrawingLocal() }
-                Button("Load(Local)") { loadDrawingLocal() }
-
-                Spacer()
-
-                Button("Save(Photos)") { saveMergedToPhotos() }
-            }
-        }
-        .padding(10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    func modeButton(_ title: String, _ mode: InteractionMode) -> some View {
-        Button {
-            interactionMode = mode
-        } label: {
-            Text(title)
-                .fontWeight(.semibold)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(interactionMode == mode ? Color.blue.opacity(0.25) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-    }
-}
-
-
 ./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+RectListPanel.swift
 ----------------------------------------
 import DrawingKit
@@ -732,7 +661,8 @@ struct OperationScreen: View {
     // 選択
     @State var selectedRectIDs: Set<UUID> = []
 
-    // 保存キー（サンプル）
+    //  保存キー
+    //  Actionsで使用
     @State var imageKey: String = "sample1"
     @State var drawingKey: String = "v1"
 
@@ -744,12 +674,22 @@ struct OperationScreen: View {
         ZStack {
             canvasLayer
 
-            // ✅ iPadだけ上部バー
+            // iPadだけ上部バー
             if !isPhoneLayout {
-                topBarLayer
+                OperationiPadTopBar(
+                            interactionMode: $interactionMode,
+                            isRectListVisible: $isRectListVisible,
+                            viewportScale: viewportState.scale,
+                            imageKey: $imageKey,
+                            drawingKey: $drawingKey,
+                            onResetZoom: { zoomRequest = .reset },
+                            onSaveLocal: { saveDrawingLocal() },
+                            onLoadLocal: { loadDrawingLocal() },
+                            onSavePhotos: { saveMergedToPhotos() }
+                            )
             }
 
-            // ✅ iPad: floating
+            // iPad: floating
             if !isPhoneLayout {
                 drawingPanelLayer
                 rectListPanelLayer
@@ -757,7 +697,7 @@ struct OperationScreen: View {
                 modePanelLayer
             }
 
-            // ✅ iPhone: 固定バー + sheet
+            // iPhone: 固定バー + sheet
             if isPhoneLayout {
                 phoneBottomBarLayer
             }
@@ -766,28 +706,32 @@ struct OperationScreen: View {
             // ひとまず “いまのまま” 表示するなら iPhoneでも modePanelLayer を出してOK。
             // ただし上部バーは出さないので、UI的には phoneSheet化の方が自然。
         }
-        .onChange(of: canvas) { _ in
+        .onChange(of: canvas) {
             applyInteractionModeToCanvas()
             syncCanvasToolState()
             syncOverlayRects()
         }
-        .onChange(of: interactionMode) { _ in
+        .onChange(of: interactionMode) {
             applyInteractionModeToCanvas()
             syncCanvasToolState()
         }
-        .onChange(of: drawingSettings) { _ in
+        .onChange(of: drawingSettings) {
             syncCanvasToolState()
         }
-        .onChange(of: overlayRects) { _ in
+        .onChange(of: overlayRects) {
             syncOverlayRects()
         }
-        .onChange(of: selectedRectIDs) { _ in
+        .onChange(of: selectedRectIDs) {
             syncOverlayRects()
         }
         .sheet(item: $presentedPanel) { route in
             phoneSheet(for: route)
         }
     }
+}
+
+#Preview {
+    OperationScreen()
 }
 
 
@@ -894,15 +838,12 @@ extension OperationScreen {
             selectedRectIDs.insert(hit.id)
         }
 
-        // ✅ タップしたら「一覧表示」は欲しいが、別機能として維持（iPadはパネル、iPhoneはsheet）
+        // タップしたら「一覧表示」は欲しいが、別機能として維持（iPadはパネル、iPhoneはsheet）
         if isPhoneLayout {
-            presentedPanel = .selection
         } else {
-            isRectListVisible = true
         }
     }
 }
-
 
 
 ./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Types.swift
