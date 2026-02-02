@@ -4,8 +4,8 @@ import SwiftUI
 extension OperationScreen {
 
     @ViewBuilder
-    var drawingPanelLayer: some View {
-        if interactionMode == .drawing {
+    var drawingSettingPanelLayer: some View {
+        if interactionMode == .drawing && isDrawingSettingsPanelVisible {
             GeometryReader { proxy in
                 CommonFloatingPanel(
                     kind: .drawing,
@@ -13,8 +13,8 @@ extension OperationScreen {
                     width: panelWidth,
                     margin: 12,
                     headerHeight: 44,
-                    title: "書き込みモード",
-                    onClose: { interactionMode = .normal },
+                    title: "ツール選択",
+                    onClose: { isDrawingSettingsPanelVisible = false },
                     trailing: { AnyView(EmptyView()) },
                     position: $panelPos,
                     didInitPosition: $didInitPanelPos
@@ -36,37 +36,13 @@ extension OperationScreen {
             .ignoresSafeArea()
         }
     }
-
-    @ViewBuilder
-    var rectListPanelLayer: some View {
-        if isRectListVisible {
-            GeometryReader { proxy in
-                CommonFloatingPanel(
-                    kind: .rectList,
-                    containerSize: proxy.size,
-                    width: rectListPanelWidth,
-                    margin: 12,
-                    headerHeight: 44,
-                    title: "Rect一覧（overlay）",
-                    onClose: { isRectListVisible = false },
-                    trailing: { AnyView(EmptyView()) },
-                    position: $rectListPanelPos,
-                    didInitPosition: $didInitRectListPanelPos
-                ) {
-                    rectListPanelContent
-                        .padding(.horizontal, 12)
-                }
-            }
-            .ignoresSafeArea()
-        }
-    }
     
     @ViewBuilder
     var unconfirmedPartsPanelLayer: some View {
         if isUnconfirmedPartsVisible {
             GeometryReader { proxy in
                 CommonFloatingPanel(
-                    kind: .rectList, // 専用kindが無いなら一旦これでOK（できれば .unconfirmed を増やす）
+                    kind: .unconfirmedParts,
                     containerSize: proxy.size,
                     width: unconfirmedPartsPanelWidth,
                     margin: 12,
@@ -87,9 +63,12 @@ extension OperationScreen {
                                 centerInImage: c
                             )
                         },
-                        onCameraCheckback: { selectedRects in
-                            print("camera checkback selected:", selectedRects.count)
-                        }
+                        onCameraCheckback: { selected in
+                            // 必要なら
+                        },
+                        onOpenProject: { pid,rect in
+                            openProject(projectID: pid,zoomRect: rect)
+                        },
                     )
                     .frame(
                         minHeight: proxy.size.height * 2.0 / 3.0
@@ -100,4 +79,59 @@ extension OperationScreen {
         }
     }
 
+    @ViewBuilder
+    var memoPanelLayer: some View {
+        if isMemoVisible {
+            GeometryReader { proxy in
+                CommonFloatingPanel(
+                    kind: .memo,
+                    containerSize: proxy.size,
+                    width: memoPanelWidth,
+                    margin: 12,
+                    headerHeight: 44,
+                    title: "メモ",
+                    onClose: { isMemoVisible = false },
+                    trailing: { AnyView(EmptyView()) },
+                    position: $memoPanelPos,
+                    didInitPosition: $didInitMemoPanelPos
+                ) {
+                    MemoPanelView(
+                        text: $memoText,
+                        onSave: { /*saveMemo(text: memoText)*/ },
+                        onDiscard: { memoText = "" ; isMemoVisible = false }
+                    )
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
+    
+    @ViewBuilder
+    var linkProjectsPanelLayer: some View {
+        if isLinkProjectsVisible {
+            GeometryReader { proxy in
+                CommonFloatingPanel(
+                    kind: .linkProjects,
+                    containerSize: proxy.size,
+                    width: linkProjectsPanelWidth,
+                    margin: 12,
+                    headerHeight: 50,
+                    title: "リンクプロジェクトリスト",
+                    onClose: { isLinkProjectsVisible = false },
+                    trailing: { AnyView(EmptyView()) },
+                    position: $linkProjectsPos,
+                    didInitPosition: $didInitLinkProjectsPanelPos
+                ) {
+                    LinkProjectsPanelView(items: SampleData.linkProjects){selectedProject in
+                        openProject(projectID: selectedProject.id, zoomRect: nil)
+                    }
+                    .frame(
+                        minHeight: proxy.size.height * 2.0 / 4.0
+                    )
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
+    
 }

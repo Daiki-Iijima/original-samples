@@ -30,30 +30,24 @@ public struct CanvasRectStyle: Equatable, @unchecked Sendable {
 
 /// 画像座標（左上原点）で指定する矩形
 public struct CanvasRect: Equatable, Identifiable {
-    // ---- 既存 ----
-    public var id: UUID
-    public var rect: CGRect
-    public var style: CanvasRectStyle
+        public let id: UUID
+        public var externalID: String?
+        public var name: String
 
-    // ---- 業務フィールド ----
+        public var projectID: String
+        public var projectName: String
 
-    /// 外部データの固有ID（DBやAPIのIDなど）
-    /// UUID/Int/ULID など何でも入れられるよう String 推奨
-    public var externalID: String?
-
-    /// 表示名（UI一覧で使う）
-    public var name: String
-
-    /// 業務フラグ：チェック済み
-    public var isChecked: Bool
-
-    /// 表示/非表示（業務都合で非表示判定したいならあると便利）
-    public var isHidden: Bool
+        public var isChecked: Bool
+        public var isHidden: Bool
+        public var rect: CGRect
+        public var style: CanvasRectStyle
 
     public init(
         id: UUID = UUID(),
         externalID: String? = nil,
         name: String = "",
+        projectID: String = "",
+        projectName: String = "",
         isChecked: Bool = false,
         isHidden: Bool = false,
         rect: CGRect,
@@ -62,6 +56,8 @@ public struct CanvasRect: Equatable, Identifiable {
         self.id = id
         self.externalID = externalID
         self.name = name
+        self.projectID = projectID
+        self.projectName = projectName
         self.isChecked = isChecked
         self.isHidden = isHidden
         self.rect = rect

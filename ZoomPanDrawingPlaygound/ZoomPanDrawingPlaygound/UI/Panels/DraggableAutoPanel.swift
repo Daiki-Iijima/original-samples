@@ -44,6 +44,8 @@ struct DraggableAutoPanel<Header: View, Content: View>: View {
 
     // 中身の計測値
     @State private var contentHeight: CGFloat = 0
+    
+    @State private var didInitPosition = false
 
     // ドラッグ中の一時オフセット（これが “ピタ追従” のコツ）
     @GestureState private var dragOffset: CGSize = .zero
@@ -80,7 +82,14 @@ struct DraggableAutoPanel<Header: View, Content: View>: View {
         .overlay(shape.stroke(.white.opacity(0.15), lineWidth: 1))
         .position(position)
         .offset(dragOffset)
+        .onAppear {
+            guard !didInitPosition else { return }
+            didInitPosition = true
+            position = clamp(position, panelSize: panelSize)
+        }
         .onChange(of: panelSize.height) {
+            // 初期化済みなら追従（リサイズで画面外に出ないため）
+            guard didInitPosition else { return }
             position = clamp(position, panelSize: panelSize)
         }
     }

@@ -1,5 +1,6 @@
 enum PanelKind: Hashable {
     case drawing  // 描画時の設定パネル
-    case rectList  //  存在している矩形一覧
-    case selection  //  選択された矩形一覧
+    case unconfirmedParts // 未確定部材一覧
+    case memo // メモ
+    case linkProjects // リンクプロジェクト一覧
 }

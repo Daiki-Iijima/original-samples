@@ -50,6 +50,7 @@ struct CommonFloatingPanel<Content: View>: View {
         }
     }
 
+    //  パネル初期位置設定
     private func initPositionIfNeeded() {
         guard !didInitPosition else { return }
         didInitPosition = true
@@ -61,16 +62,23 @@ struct CommonFloatingPanel<Content: View>: View {
                 x: containerSize.width - width / 2 - 16,
                 y: containerSize.height - 140
             )
-        case .rectList:
-            position = CGPoint(
-                x: containerSize.width - width / 2 - 16,
-                y: 140
-            )
-        case .selection:
-            // 左上寄せ（rectListと被らない場所）
+        case .unconfirmedParts:
+            // 左下寄せ
             position = CGPoint(
                 x: width / 2 + 16,
+                y: 500
+            )
+        case .memo:
+            // 画面中心上部
+            position = CGPoint(
+                x: containerSize.width / 2,
                 y: 140
+            )
+        case .linkProjects:
+            // 左下寄せ
+            position = CGPoint(
+                x: containerSize.width - width / 2 - 16,
+                y: 500
             )
         }
     }

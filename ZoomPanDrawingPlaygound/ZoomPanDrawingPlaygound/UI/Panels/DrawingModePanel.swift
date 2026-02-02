@@ -80,12 +80,17 @@ struct DrawingModePanel: View {
 
     private var bottomRow: some View {
         HStack(spacing: 10) {
-            Button("↩︎", action: onUndo).buttonStyle(.borderedProminent)
-            Button("↪︎", action: onRedo).buttonStyle(.borderedProminent)
+            Button(action: onUndo) {
+                Label("", systemImage: "arrow.uturn.left")
+                    .frame(maxWidth: .infinity, minHeight: 32)
+            }
+            .buttonStyle(.borderedProminent)
 
-            Spacer()
-
-            Button("保存", action: onSave).buttonStyle(.borderedProminent)
+            Button(action: onRedo) {
+                Label("", systemImage: "arrow.uturn.right")
+                    .frame(maxWidth: .infinity, minHeight: 32)
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 

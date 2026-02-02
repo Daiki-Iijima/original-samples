@@ -6,15 +6,15 @@ import UIKit
 enum InteractionMode: Equatable {
     case normal
     case drawing
-    case zoomPreset
-    case rectPreset
+    case camera
 }
 
 // iPhone sheet route
 enum PanelRoute: String, Identifiable {
-    case drawing
-    case rectList
-    case unconfirmedParts //    未選択部材一覧パネル
+    case drawingTools
+    case unconfirmedParts
+    case memo
+    case linkProjects
 
     var id: String { rawValue }
 }
@@ -33,6 +33,16 @@ struct RectPreset: Equatable {
 }
 
 enum SampleData {
+    
+    static let linkProjects: [LinkProjectItem] = {
+        // プロジェクト定義
+        let projects: [LinkProjectItem] = [
+            LinkProjectItem(id:"proj_a", name:"プロジェクトA"),
+            LinkProjectItem(id:"proj_b", name:"プロジェクトB"),
+            LinkProjectItem(id:"proj_c", name:"プロジェクトC"),
+        ]
+        return projects
+    }()
 
     static let overlayRects: [CanvasRect] = {
         var rects: [CanvasRect] = []
@@ -43,6 +53,13 @@ enum SampleData {
         let stepY: CGFloat = 120
 
         let sizeRange: ClosedRange<CGFloat> = 60...110
+
+        // プロジェクト定義
+        let projects: [(id: String, name: String)] = [
+            ("proj_a", "プロジェクトA"),
+            ("proj_b", "プロジェクトB"),
+            ("proj_c", "プロジェクトC"),
+        ]
 
         var index = 1
 
@@ -58,9 +75,14 @@ enum SampleData {
                 let isChecked = index % 7 == 0      // たまに確認済
                 let isHidden  = index % 11 == 0     // たまに非表示
 
+                // --- プロジェクト割当（3つをローテーション） ---
+                let project = projects[(index - 1) % projects.count]
+
                 let rect = CanvasRect(
                     externalID: String(format: "P-%03d", index),
                     name: "部品\(index)",
+                    projectID: project.id,
+                    projectName: project.name,
                     isChecked: isChecked,
                     isHidden: isHidden,
                     rect: CGRect(x: x, y: y, width: w, height: h),

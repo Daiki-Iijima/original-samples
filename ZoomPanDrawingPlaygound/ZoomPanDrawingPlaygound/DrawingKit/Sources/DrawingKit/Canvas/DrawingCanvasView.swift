@@ -91,6 +91,9 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
 
     /// 矩形オーバーレイ専用コンテナ
     private let rectOverlayContainerLayer = CALayer()
+    
+    /// 矩形ラベル（name）専用コンテナ
+    private let rectLabelContainerLayer = CALayer()
 
     // =========================================================
     // MARK: - Gestures
@@ -191,6 +194,15 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
             "contents": NSNull(),
         ]
         layer.addSublayer(rectOverlayContainerLayer)
+        
+        // --- rect label container ---
+        rectLabelContainerLayer.actions = [
+            "sublayers": NSNull(),
+            "bounds": NSNull(),
+            "position": NSNull(),
+            "contents": NSNull(),
+        ]
+        layer.addSublayer(rectLabelContainerLayer)
 
         // --- Gestures ---
         addGestureRecognizer(drawPan)
@@ -211,11 +223,11 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
     public override func layoutSubviews() {
         super.layoutSubviews()
 
-        // ✅ レイヤーフレーム更新で暗黙アニメが乗ると「追従が遅い」に見えるのでOFF
         withoutImplicitAnimations {
             committedContainerLayer.frame = bounds
             currentStrokeLayer.frame = bounds
             eraserPreviewLayer.frame = bounds
+            rectOverlayContainerLayer.frame = bounds
             rectOverlayContainerLayer.frame = bounds
         }
     }
@@ -282,6 +294,7 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
 
             overlayRects.removeAll()
             rectOverlayContainerLayer.sublayers?.removeAll()
+            rectLabelContainerLayer.sublayers?.removeAll()
         }
     }
 
@@ -859,24 +872,30 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
     private func redrawOverlayRects() {
         withoutImplicitAnimations {
             rectOverlayContainerLayer.sublayers?.removeAll()
+            rectLabelContainerLayer.sublayers?.removeAll()
+
             guard !overlayRects.isEmpty else { return }
 
             for r in overlayRects {
+                // --- rect ---
                 let l = CAShapeLayer()
                 l.strokeColor = r.style.strokeColor.cgColor
                 l.lineWidth = max(0.5, r.style.strokeWidth)
                 l.lineJoin = .round
                 l.fillColor = fillColor(from: r.style.fill)
-
                 l.actions = [
                     "path": NSNull(),
                     "strokeColor": NSNull(),
                     "fillColor": NSNull(),
                     "lineWidth": NSNull(),
                 ]
-
                 l.path = makeRectPathInView(fromCanvasRect: r.rect)
                 rectOverlayContainerLayer.addSublayer(l)
+
+                // --- label (name) ---
+                if !r.name.isEmpty {
+                    rectLabelContainerLayer.addSublayer(makeLabelLayer(for: r))
+                }
             }
         }
     }
@@ -926,6 +945,60 @@ public final class DrawingCanvasView: UIView, UIGestureRecognizerDelegate {
         body()
         CATransaction.commit()
     }
+    
+    private func makeLabelLayer(for r: CanvasRect) -> CATextLayer {
+        // --- 矩形の中心（canvas座標） ---
+        let centerCanvas = CGPoint(
+            x: r.rect.midX,
+            y: r.rect.midY
+        )
+
+        // canvas → view 座標
+        let centerView = canvasPointToViewPoint?(centerCanvas) ?? centerCanvas
+
+        let t = CATextLayer()
+        t.string = r.name
+
+        // Retina対策（超重要）
+        let scale = window?.windowScene?.screen.scale ?? traitCollection.displayScale
+        t.contentsScale = scale
+
+        // 見た目
+        t.foregroundColor = UIColor.label.cgColor
+        t.cornerRadius = 4
+        t.masksToBounds = true
+        t.alignmentMode = .center
+        t.truncationMode = .end
+
+        // --- フォントサイズ：ズームに追従 ---
+        let baseFontSize: CGFloat = 12
+        let zoomScale = max(0.5, viewToCanvasScale)   // 安全ガード
+        let fontSize = baseFontSize * zoomScale
+
+        t.fontSize = fontSize
+
+        // サイズ測定（UIFontで確実に）
+        let measured = (r.name as NSString).size(withAttributes: [
+            .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold)
+        ])
+
+        let paddingX: CGFloat = 8
+        let paddingY: CGFloat = 4
+
+        let w = ceil(measured.width) + paddingX * 2
+        let h = ceil(measured.height) + paddingY * 2
+
+        // --- 中心配置 ---
+        t.frame = CGRect(
+            x: centerView.x - w * 0.5,
+            y: centerView.y - h * 0.5,
+            width: w,
+            height: h
+        )
+
+        return t
+    }
+
 }
 
 // =========================================================
