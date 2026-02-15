@@ -242,39 +242,71 @@ final class OperationStore: ObservableObject {
     /// 2) 未確認部材一覧ONの時だけ、未チェックを表示
     ///    - ただし “現在選択中プロジェクト分だけ” 表示（見た目が散らからないため）
     func makeDisplayOverlayRects() -> [CanvasRect] {
-       
-        //  ユーザー設定を読み込み
-        let checkedStyle = style(from: config.checked)
-        let unconfirmedStyle = style(from: config.unconfirmed)
-        let selectedStyle = style(from: config.selection)
-        
-        // 1) チェック済み
+
+        let cfg = OperationConfigStore.shared.config
+
+        // 1) チェック済み：常時表示
         let checkedAll: [CanvasRect] = overlayRects
             .filter { !$0.isHidden && $0.isChecked }
             .map { r in
-                var rr = r
-                rr = rr.with(style: checkedStyle)
-                return rr
+                var s = r.style
+
+                // stroke/fill
+                s.strokeColor = cfg.checked.strokeColor.uiColor(alpha: cfg.checked.strokeAlpha)
+                s.strokeWidth = max(s.strokeWidth, cfg.checked.strokeWidth)
+                s.fill = cfg.checked.fillEnabled
+                    ? .solid(cfg.checked.fillColor.uiColor(alpha: cfg.checked.fillAlpha))
+                    : .none
+
+                // ✅ text
+                s.textColor = cfg.checked.textColor.uiColor(alpha: cfg.checked.textAlpha)
+
+                return r.with(style: s)
             }
 
-        // 2) 未確認：一覧ONの時だけ、現在プロジェクト分のみ（黄色系）
-        let unconfirmedInCurrentProject: [CanvasRect]
-        if isUnconfirmedPartsVisible, let pid = currentProjectID {
-            unconfirmedInCurrentProject = overlayRects
-                .filter { !$0.isHidden && !$0.isChecked && $0.projectID == pid }
-                .map { $0.with(style: unconfirmedStyle) }
-        } else {
-            unconfirmedInCurrentProject = []
-        }
-        // 3) 選択中の強調（最優先で上書き）
-        func applySelected(_ rects: [CanvasRect]) -> [CanvasRect] {
+        // 2) 未確認：一覧ONの時だけ現在プロジェクト分
+        let unconfirmedInCurrentProject: [CanvasRect] = {
+            guard isUnconfirmedPartsVisible else { return [] }
+            let unconfirmed = overlayRects.filter { !$0.isHidden && !$0.isChecked }
+            guard let pid = currentProjectID else { return [] }
+
+            return unconfirmed
+                .filter { $0.projectID == pid }
+                .map { r in
+                    var s = r.style
+                    s.strokeColor = cfg.unconfirmed.strokeColor.uiColor(alpha: cfg.unconfirmed.strokeAlpha)
+                    s.strokeWidth = max(s.strokeWidth, cfg.unconfirmed.strokeWidth)
+                    s.fill = cfg.unconfirmed.fillEnabled
+                        ? .solid(cfg.unconfirmed.fillColor.uiColor(alpha: cfg.unconfirmed.fillAlpha))
+                        : .none
+
+                    // ✅ text
+                    s.textColor = cfg.unconfirmed.textColor.uiColor(alpha: cfg.unconfirmed.textAlpha)
+
+                    return r.with(style: s)
+                }
+        }()
+
+        // 3) 選択中（最優先）
+        func applySelectedStyle(_ rects: [CanvasRect]) -> [CanvasRect] {
             rects.map { r in
                 guard selectedRectIDs.contains(r.id) else { return r }
-                return r.with(style: selectedStyle)
+                var s = r.style
+
+                s.strokeColor = cfg.selection.strokeColor.uiColor(alpha: cfg.selection.strokeAlpha)
+                s.strokeWidth = max(s.strokeWidth, cfg.selection.strokeWidth)
+                s.fill = cfg.selection.fillEnabled
+                    ? .solid(cfg.selection.fillColor.uiColor(alpha: cfg.selection.fillAlpha))
+                    : .none
+
+                // ✅ text
+                s.textColor = cfg.selection.textColor.uiColor(alpha: cfg.selection.textAlpha)
+
+                return r.with(style: s)
             }
         }
 
-        return applySelected(checkedAll) + applySelected(unconfirmedInCurrentProject)
+        return applySelectedStyle(checkedAll) + applySelectedStyle(unconfirmedInCurrentProject)
     }
 }
 

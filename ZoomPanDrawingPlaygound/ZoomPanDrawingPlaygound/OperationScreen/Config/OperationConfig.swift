@@ -12,15 +12,24 @@ struct OperationConfig: Codable, Equatable, Sendable {
         var fillColor: HexColor = .init(hex: "#00C853")
         var fillAlpha: Double = 0.18
         var fillEnabled: Bool = true
+        
+        //  矩形の中の色
+        var textColor: HexColor = .init(hex: "#FFFFFF")
+        var textAlpha: Double = 1.0
     }
 
     struct CheckedStyle: Codable, Equatable, Sendable {
         var strokeColor: HexColor = .init(hex: "#1976D2") // blue
         var strokeAlpha: Double = 1.0
         var strokeWidth: Double = 2
+        
         var fillEnabled: Bool = false
         var fillAlpha: Double = 0.0
         var fillColor: HexColor = .init(hex: "#1976D2")
+        
+        //  矩形の中の色
+        var textColor: HexColor = .init(hex: "#FFFFFF")
+        var textAlpha: Double = 1.0
     }
 
     struct UnconfirmedStyle: Codable, Equatable, Sendable {
@@ -31,6 +40,10 @@ struct OperationConfig: Codable, Equatable, Sendable {
         var fillColor: HexColor = .init(hex: "#FBC02D")
         var fillAlpha: Double = 0.12
         var fillEnabled: Bool = true
+        
+        //  矩形の中の色
+        var textColor: HexColor = .init(hex: "#FFFFFF")
+        var textAlpha: Double = 1.0
     }
 
     struct PanelWidths: Codable, Equatable, Sendable {

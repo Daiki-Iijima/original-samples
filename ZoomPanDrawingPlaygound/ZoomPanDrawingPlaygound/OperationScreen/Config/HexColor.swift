@@ -46,6 +46,12 @@ private extension UIColor {
     }
 }
 
+extension HexColor {
+    func uiColor(alpha: CGFloat) -> UIColor {
+        uiColor.withAlphaComponent(alpha)
+    }
+}
+
 extension Color {
     /// 色空間ズレOK前提：ColorPicker で選んだ色を #RRGGBB に丸める
     func toHexStringLossy() -> String {

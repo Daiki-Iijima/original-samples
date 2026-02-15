@@ -58,9 +58,11 @@ struct OperationConfigView: View {
                 .disabled(!draft.selection.fillEnabled)
             sliderRow("背景の透明度", value: $draft.selection.fillAlpha, range: 0...1, format: "%.2f")
                 .disabled(!draft.selection.fillEnabled)
-        }
+            
+            colorRow("テキストの色", color: $draft.selection.textColor)
+            sliderRow("テキストの透明度", value: $draft.selection.textAlpha, range: 0...1, format: "%.2f")        }
     }
-
+    
     private var checkedSection: some View {
         Section("チェック済み矩形（常時表示）") {
             colorRow("線の色", color: $draft.checked.strokeColor)
@@ -72,6 +74,9 @@ struct OperationConfigView: View {
                 .disabled(!draft.checked.fillEnabled)
             sliderRow("背景の透明度", value: $draft.checked.fillAlpha, range: 0...1, format: "%.2f")
                 .disabled(!draft.checked.fillEnabled)
+            
+            colorRow("テキストの色", color: $draft.selection.textColor)
+                   sliderRow("テキストの透明度", value: $draft.selection.textAlpha, range: 0...1, format: "%.2f")
         }
     }
 
@@ -86,6 +91,9 @@ struct OperationConfigView: View {
                 .disabled(!draft.unconfirmed.fillEnabled)
             sliderRow("背景の透明度", value: $draft.unconfirmed.fillAlpha, range: 0...1, format: "%.2f")
                 .disabled(!draft.unconfirmed.fillEnabled)
+            
+            colorRow("テキストの色", color: $draft.selection.textColor)
+                   sliderRow("テキストの透明度", value: $draft.selection.textAlpha, range: 0...1, format: "%.2f")
         }
     }
 
