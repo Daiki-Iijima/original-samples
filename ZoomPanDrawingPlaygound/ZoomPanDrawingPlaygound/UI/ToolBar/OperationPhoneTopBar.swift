@@ -7,6 +7,7 @@ struct OperationPhoneTopBar: View {
     var onBack: () -> Void
     var onResetZoom: () -> Void
     var onForceQuit: () -> Void
+    var onOpenConfig: () -> Void
 
     var body: some View {
         HStack() {
@@ -38,6 +39,15 @@ struct OperationPhoneTopBar: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
+            
+            Button(action: onOpenConfig) {
+                Image(systemName: "gearshape")
+                    .font(.headline)
+                    .frame(width: 44, height: 34)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
         }
         .padding(10)
         .background(.ultraThinMaterial)

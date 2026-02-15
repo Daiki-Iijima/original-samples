@@ -1,164 +1,1672 @@
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Presets.swift
+ZoomPanDrawingPlaygound/ImageCache.swift
+----------------------------------------
+import Foundation
+
+/// entryProject の画像だけ固定（ロック）するキャッシュ
+/// - 「画面復帰のたびに一覧は更新するが、entry画像だけ使い回す」要件を満たす
+@MainActor
+final class ImageCache {
+    static let shared = ImageCache()
+    private init() {}
+
+    private var lockedEntry: [String: LoadedImage] = [:]   // projectID -> 固定画像
+
+    func entryImage(for projectID: String) -> LoadedImage? {
+        lockedEntry[projectID]
+    }
+
+    func setEntryImage(_ image: LoadedImage, for projectID: String) {
+        lockedEntry[projectID] = image
+    }
+
+    func clearEntryImage(for projectID: String) {
+        lockedEntry.removeValue(forKey: projectID)
+    }
+
+    func resetAll() {
+        lockedEntry.removeAll()
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/Mode/DrawingSettings.swift
 ----------------------------------------
 import DrawingKit
 import SwiftUI
-import UIKit
 
-extension OperationScreen {
+/// ペンの設定
+struct PenSettings: Equatable {
+    var color: Color = .red
+    var width: CGFloat = 4
+    var opacity: CGFloat = 1.0
+}
 
-    @ViewBuilder
-    var modePanelLayer: some View {
-        if interactionMode == .zoomPreset {
-            VStack {
-                zoomPresetPanel
-                Spacer()
-            }.padding()
-        } else if interactionMode == .rectPreset {
-            VStack {
-                rectPresetPanel
-                Spacer()
-            }.padding()
-        }
-    }
+/// スタンプの設定
+struct StampSettings: Equatable {
+    var kind: StampKind = .check
+    var color: Color = .red
+    var size: CGFloat = 36
+    var opacity: CGFloat = 1.0
+}
 
-    var zoomPresetPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Zoom指定（画像座標）").font(.headline)
-                Spacer()
-                Button("閉じる") { interactionMode = .normal }
-            }
+/// 消しゴムの設定
+struct EraserSettings: Equatable {
+    var radius: CGFloat = 18
+}
 
-            HStack {
-                numberField("centerX", value: $zoomPreset.centerX, width: 110)
-                numberField("centerY", value: $zoomPreset.centerY, width: 110)
-                numberField("scale", value: $zoomPreset.scale, width: 90)
-            }
+/// 描画ツール全体の設定
+struct DrawingSettings: Equatable {
+    /// 今どのツールで描くか
+    var tool: DrawMode = .pen
 
-            HStack {
-                Button("この値でZoom") {
-                    zoomRequest = .set(
-                        scale: zoomPreset.scale,
-                        centerInImage: CGPoint(x: zoomPreset.centerX, y: zoomPreset.centerY)
-                    )
+    var pen = PenSettings()
+    var stamp = StampSettings()
+    var eraser = EraserSettings()
+}
+
+
+ZoomPanDrawingPlaygound/UI/GeneralParts/TogglePillButton.swift
+----------------------------------------
+import SwiftUI
+
+struct TogglePillButton: View {
+    let title: String
+    @Binding var isOn: Bool
+    var systemImage: String? = nil
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                if let systemImage {
+                    Image(systemName: systemImage)
                 }
 
-                Button("中心を現在表示中心に") {
-                    zoomPreset.centerX = viewportState.centerInImage.x
-                    zoomPreset.centerY = viewportState.centerInImage.y
+                Text(title)
+                    .fontWeight(.semibold)
+
+                if isOn {
+                    Image(systemName: "checkmark.circle.fill")
+                        .imageScale(.medium)
                 }
-
-                Spacer()
             }
-        }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    var rectPresetPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("矩形追加（overlay / 画像座標）").font(.headline)
-                Spacer()
-                Button("閉じる") { interactionMode = .normal }
-            }
-
-            HStack {
-                numberField("centerX", value: $rectPreset.centerX, width: 110)
-                numberField("centerY", value: $rectPreset.centerY, width: 110)
-            }
-
-            HStack {
-                numberField("width", value: $rectPreset.width, width: 110)
-                numberField("height", value: $rectPreset.height, width: 110)
-            }
-
-            HStack {
-                Button("矩形を追加") { appendOverlayRectFromPreset() }
-                Button("全部クリア") {
-                    overlayRects.removeAll()
-                    selectedRectIDs.removeAll()
-                }
-                Spacer()
-            }
-        }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    func appendOverlayRectFromPreset() {
-        let rect = CGRect(
-            x: rectPreset.centerX - rectPreset.width * 0.5,
-            y: rectPreset.centerY - rectPreset.height * 0.5,
-            width: rectPreset.width,
-            height: rectPreset.height
-        )
-
-        let style = CanvasRectStyle(
-            strokeColor: .systemYellow,
-            strokeWidth: 3,
-            fill: .solid(UIColor.systemYellow.withAlphaComponent(0.15))
-        )
-
-        overlayRects.append(
-            CanvasRect(
-                externalID: nil,
-                name: "新規Rect",
-                isChecked: false,
-                isHidden: false,
-                rect: rect,
-                style: style
+            .font(.subheadline)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isOn ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isOn ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.25), lineWidth: 1)
             )
-        )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain) // 見た目を自前で作る
+    }
+}
+
+#Preview {
+    TogglePillButton(title: "Hello, World!", isOn: .constant(false))
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/PanelKind.swift
+----------------------------------------
+enum PanelKind: Hashable {
+    case drawing  // 描画時の設定パネル
+    case unconfirmedParts // 未確定部材一覧
+    case memo // メモ
+    case linkProjects // リンクプロジェクト一覧
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/UnconfirmedPartsPanelView.swift
+----------------------------------------
+import SwiftUI
+import DrawingKit
+
+/// 未確認部材一覧パネル（ダミーUI）
+///
+/// - rects: 表示対象の矩形（OperationScreen側で「未確認のみ」などをフィルタして渡す想定）
+/// - selectedRectIDs: 選択状態（OperationScreenと共有して Canvas 側のハイライトとも連動させる）
+struct UnconfirmedPartsPanelView: View {
+
+    // 表示対象（OperationScreen側でフィルタして渡す）
+    let rects: [CanvasRect]
+
+    // OperationScreenの選択と直結（複数選択可）
+    @Binding var selectedRectIDs: Set<UUID>
+
+    // 行タップ時：該当Rectへズームさせる（呼び出し元で zoomRequest を発行）
+    var onZoom: (CanvasRect) -> Void = { _ in }
+
+    // 下部ボタン押下時：選択中のRect一覧をまとめて返す
+    var onCameraCheckback: (_ selected: [CanvasRect]) -> Void = { _ in }
+    
+    // 行タップ時：そのプロジェクトを開く（画像切替・overlay再描画は呼び出し元がやる）
+    var onOpenProject: (_ projectID: String, _ zoomRect: CanvasRect?) -> Void = { _,_  in }
+
+    // 選択があるかどうか（可読性のため）
+    private var hasSelection: Bool { !selectedRectIDs.isEmpty }
+
+    /// プロジェクトごとにグルーピングした表示用セクション
+    /// - projectID は識別用（安定）
+    /// - projectName は表示用（UI）
+    private var projectSections: [ProjectSection] {
+        let dict = Dictionary(grouping: rects) { $0.projectID }
+
+        return dict.map { (projectID, rects) in
+            ProjectSection(
+                projectID: projectID,
+                projectName: rects.first?.projectName ?? "（不明）",
+                rects: rects
+            )
+        }
+        // 表示順は projectName で揃える（ID順にしたいならここを projectID に）
+        .sorted { $0.projectName.localizedStandardCompare($1.projectName) == .orderedAscending }
     }
 
-    func numberField(_ title: String, value: Binding<CGFloat>, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            TextField(
-                title,
-                text: Binding(
-                    get: { String(format: "%.2f", value.wrappedValue) },
-                    set: { newText in
-                        let filtered = newText.replacingOccurrences(of: ",", with: ".")
-                        if let v = Double(filtered) {
-                            value.wrappedValue = CGFloat(v)
+    var body: some View {
+        VStack(spacing: 0) {
+
+            // パネル上部（全体件数・全解除など）
+            headerRow
+
+            // 一覧本体
+            ScrollView {
+                VStack(spacing: 0) {
+                    if rects.isEmpty {
+                        // 空状態表示
+                        Text("未確認の項目がありません")
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 12)
+                    } else {
+                        // プロジェクト単位のセクション表示
+                        ForEach(projectSections) { section in
+                            projectHeader(section)
+
+                            ForEach(section.rects) { rect in
+                                row(rect)
+                                Divider().opacity(0.25)
+                            }
                         }
                     }
-                )
+                }
+            }
+
+            // 選択がある時だけチェックバックボタンを表示
+            if hasSelection {
+                Button {
+                    // 選択中のRectを抽出してコールバックに渡す
+                    let selected = rects.filter { selectedRectIDs.contains($0.id) }
+                    onCameraCheckback(selected)
+                } label: {
+                    Text("カメラチェックバック")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                }
+                .foregroundStyle(.black)
+                .background(Color.green.opacity(0.65))
+            }
+        }
+    }
+
+    // MARK: - Header (Panel)
+
+    private var headerRow: some View {
+        HStack {
+            Text("未確認部材数 : \(rects.count)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            // 選択がある時だけ全解除を表示
+            if hasSelection {
+                Button("全解除") {
+                    selectedRectIDs.removeAll()
+                }
+                .font(.caption.weight(.semibold))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+    }
+
+    // MARK: - Header (Project Section)
+
+    /// プロジェクト見出し（ヘッダー）
+    private func projectHeader(_ section: ProjectSection) -> some View {
+        HStack(spacing: 8) {
+            Text(section.projectName)
+                .font(.headline)
+                .lineLimit(1)
+
+            Spacer()
+
+            Text("\(section.rects.count)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+        .background(Color(.systemGray5))
+    }
+
+    // MARK: - Row
+
+    /// 1行表示
+    /// - 右端チェックは「選択トグル」
+    /// - 行タップは「ズーム」（選択は変えない）
+    @ViewBuilder
+    private func row(_ rect: CanvasRect) -> some View {
+        let isSelected = selectedRectIDs.contains(rect.id)
+
+        HStack(spacing: 10) {
+
+            // メイン表示：externalID があればそれを優先
+            VStack(alignment: .leading, spacing: 4) {
+                Text(primaryTitle(for: rect))
+                    .font(.body)
+                    .lineLimit(1)
+
+                // externalID があり、かつ name もある場合は補助として name を表示
+                if rect.externalID != nil, !rect.name.isEmpty {
+                    Text(rect.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            // 選択トグル（複数選択OK）
+            Button {
+                toggle(rect.id)
+            } label: {
+                Image(systemName: isSelected ? "checkmark.square" : "square")
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            isSelected
+                ? Color.accentColor.opacity(0.12)
+                : Color(.systemBackground)
+        )
+        // 行全体をタップ領域にする（チェックボタン以外のタップでズームしたい）
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // プロジェクトとズームを依頼
+            onOpenProject(rect.projectID,rect)
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// 行の主タイトル
+    /// - externalID があれば externalID
+    /// - 無ければ name
+    /// - name も無ければプレースホルダ
+    private func primaryTitle(for rect: CanvasRect) -> String {
+        if let ext = rect.externalID, !ext.isEmpty {
+            return ext
+        }
+        if !rect.name.isEmpty {
+            return rect.name
+        }
+        return "（名称未設定）"
+    }
+
+    /// 選択トグル
+    private func toggle(_ id: UUID) {
+        if selectedRectIDs.contains(id) {
+            selectedRectIDs.remove(id)
+        } else {
+            selectedRectIDs.insert(id)
+        }
+    }
+}
+
+// MARK: - Section Model (View internal)
+
+/// View内でだけ使う、プロジェクト単位のセクションモデル
+private struct ProjectSection: Identifiable {
+    let projectID: String
+    let projectName: String
+    let rects: [CanvasRect]
+
+    var id: String { projectID }
+}
+
+#Preview {
+    UnconfirmedPartsPanelPreviewHost()
+}
+
+private struct UnconfirmedPartsPanelPreviewHost: View {
+    @State private var selected: Set<UUID> = []
+
+    // Preview用のダミーデータ
+    private let rects: [CanvasRect] = SampleData.overlayRects
+        .filter { !$0.isHidden && !$0.isChecked }  // 未確認だけ表示したいなら
+
+    var body: some View {
+        UnconfirmedPartsPanelView(
+            rects: rects,
+            selectedRectIDs: $selected,
+            onZoom: { rect in
+                print("onZoom:", rect.externalID ?? rect.name)
+            },
+            onCameraCheckback: { selectedRects in
+                print("onCameraCheckback count:", selectedRects.count)
+            },
+            onOpenProject: { pid, rect in
+                print("onOpenProject:", pid, rect?.externalID ?? rect?.name ?? "-")
+            }
+        )
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/CommonFloatingPanel.swift
+----------------------------------------
+import SwiftUI
+
+struct CommonFloatingPanel<Content: View>: View {
+    let kind: PanelKind
+    let containerSize: CGSize
+
+    let width: CGFloat
+    let margin: CGFloat
+    let headerHeight: CGFloat
+
+    let title: String
+    let onClose: () -> Void
+
+    /// 右上などに置く追加ボタン（任意）
+    @ViewBuilder var trailing: () -> AnyView
+
+    @Binding var position: CGPoint
+    @Binding var didInitPosition: Bool
+
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        DraggableAutoPanel(
+            containerSize: containerSize,
+            width: width,
+            margin: margin,
+            headerHeight: headerHeight,
+            position: $position
+        ) {
+            // 共通ヘッダー
+            HStack(spacing: 10) {
+                Image(systemName: "line.3.horizontal")
+                    .foregroundStyle(.secondary)
+
+                Text(title)
+                    .font(.headline)
+
+                Spacer()
+
+                trailing()
+
+                Button("閉じる", action: onClose)
+            }
+            .padding(.horizontal, 12)
+        } content: {
+            content()
+        }
+        .onAppear {
+            initPositionIfNeeded()
+        }
+    }
+
+    //  パネル初期位置設定
+    private func initPositionIfNeeded() {
+        guard !didInitPosition else { return }
+        didInitPosition = true
+
+        // 共通：右上寄せ / 右下寄せ など “kindごと” に決める
+        switch kind {
+        case .drawing:
+            position = CGPoint(
+                x: containerSize.width - width / 2 - 16,
+                y: containerSize.height - 140
             )
-            .textFieldStyle(.roundedBorder)
-            .frame(width: width)
-            .keyboardType(.decimalPad)
+        case .unconfirmedParts:
+            // 左下寄せ
+            position = CGPoint(
+                x: width / 2 + 16,
+                y: 500
+            )
+        case .memo:
+            // 画面中心上部
+            position = CGPoint(
+                x: containerSize.width / 2,
+                y: 140
+            )
+        case .linkProjects:
+            // 左下寄せ
+            position = CGPoint(
+                x: containerSize.width - width / 2 - 16,
+                y: 500
+            )
         }
     }
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Panels+iPad.swift
+ZoomPanDrawingPlaygound/UI/Panels/LinkProjectsPanelView.swift
+----------------------------------------
+import SwiftUI
+
+struct LinkProjectItem: Identifiable {
+    let id: String          // projectID
+    let name: String
+}
+
+struct LinkProjectsPanelView: View {
+    let items: [LinkProjectItem]
+    var onTap: (LinkProjectItem) -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(items) { item in
+                    Button {
+                        onTap(item)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.name).font(.body)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider().opacity(0.25)
+                }
+            }
+        }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/DrawingModePanelHeader.swift
 ----------------------------------------
 import DrawingKit
 import SwiftUI
 
-extension OperationScreen {
+struct DrawingModePanelHeader: View {
+    let drawMode: DrawMode
+
+    var body: some View {
+        HStack {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+            Text(titleText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.001))
+    }
+
+    private var titleText: String {
+        switch drawMode {
+        case .pen: return "ペンモード"
+        case .stamp: return "スタンプモード"
+        case .eraser: return "消しゴムモード"
+        case .none: return "描画OFF"
+        }
+    }
+
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/MemoPanelView.swift
+----------------------------------------
+import SwiftUI
+
+struct MemoPanelView: View {
+    @Binding var text: String
+    var onSave: () -> Void
+    var onDiscard: () -> Void
+
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TextEditor(text: $text)
+                .padding(12)
+                .frame(minHeight: 220)
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(12)
+                .focused($focused)
+
+            Divider().opacity(0.25)
+
+            HStack(spacing: 12) {
+                Button(role: .destructive) {
+                    onDiscard()
+                } label: {
+                    Text("破棄")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    onSave()
+                } label: {
+                    Text("保存")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(12)
+        }
+        .onAppear { DispatchQueue.main.async { focused = true } }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/DrawingModePanel.swift
+----------------------------------------
+import DrawingKit
+import SwiftUI
+
+struct DrawingModePanel: View {
+    @Binding var drawMode: DrawMode
+    @Binding var stampKind: StampKind
+
+    @Binding var color: Color
+    @Binding var lineWidth: CGFloat
+    @Binding var opacity: CGFloat
+    @Binding var eraserRadius: CGFloat
+
+    let onUndo: () -> Void
+    let onRedo: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            toolRow
+            colorRow
+            controls
+            bottomRow
+        }
+        .padding(14)
+    }
+
+    // MARK: - Rows
+
+    private var toolRow: some View {
+        HStack(spacing: 10) {
+            ForEach([DrawMode.pen, .stamp, .eraser], id: \.self) { mode in
+                Button {
+                    drawMode = mode
+                } label: {
+                    Image(systemName: mode.icon)
+                        .font(.system(size: 18, weight: .medium))
+                        .frame(width: 36, height: 36)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(drawMode == mode ? Color.blue.opacity(0.25) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var colorRow: some View {
+        HStack {
+            Text("右の色をタップで\n色を変更できます")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            ColorPicker("", selection: $color)
+                .labelsHidden()
+        }
+    }
 
     @ViewBuilder
-    var drawingPanelLayer: some View {
-        if interactionMode == .drawing {
+    private var controls: some View {
+        switch drawMode {
+        case .pen:
+            slider("太さ", $lineWidth, 1...20, format: { "\(Int($0))" })
+            slider("透明度", $opacity, 0.1...1.0, format: { String(format: "%.2f", $0) })
+
+        case .stamp:
+            stampKindRow
+            slider("サイズ", $lineWidth, 10...120, format: { "\(Int($0))" })
+            slider("透明度", $opacity, 0.1...1.0, format: { String(format: "%.2f", $0) })
+
+        case .eraser:
+            slider("半径", $eraserRadius, 6...60, format: { "\(Int($0))" })
+
+        case .none:
+            EmptyView()
+        }
+    }
+
+    private var bottomRow: some View {
+        HStack(spacing: 10) {
+            Button(action: onUndo) {
+                Label("", systemImage: "arrow.uturn.left")
+                    .frame(maxWidth: .infinity, minHeight: 32)
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button(action: onRedo) {
+                Label("", systemImage: "arrow.uturn.right")
+                    .frame(maxWidth: .infinity, minHeight: 32)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    // MARK: - Parts
+
+    private func slider(
+        _ title: String,
+        _ value: Binding<CGFloat>,
+        _ range: ClosedRange<CGFloat>,
+        format: (CGFloat) -> String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("\(title): \(format(value.wrappedValue))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Slider(value: value, in: range)
+        }
+    }
+
+    private var stampKindRow: some View {
+        HStack(spacing: 10) {
+            stampButton(.check, label: "✓")
+            stampButton(.cross, label: "✕")
+            stampButton(.circle, label: "○")
+        }
+    }
+
+    private func stampButton(_ kind: StampKind, label: String) -> some View {
+        Button {
+            stampKind = kind
+        } label: {
+            Text(label)
+                .font(.system(size: 20, weight: .bold))
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(
+                            stampKind == kind
+                                ? Color.orange.opacity(0.25) : Color.gray.opacity(0.15))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/Panels/DraggableAutoPanel.swift
+----------------------------------------
+import SwiftUI
+
+// MARK: - Height preference
+
+private struct ViewHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        // 一番大きい値を採用（レイアウト揺れ対策）
+        value = max(value, nextValue())
+    }
+}
+
+extension View {
+    fileprivate func readHeight(_ onChange: @escaping (CGFloat) -> Void) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: ViewHeightKey.self, value: proxy.size.height)
+            }
+        )
+        .onPreferenceChange(ViewHeightKey.self, perform: onChange)
+    }
+}
+
+// MARK: - Panel
+
+struct DraggableAutoPanel<Header: View, Content: View>: View {
+    let containerSize: CGSize
+
+    /// 横幅は固定にしやすい（まずは固定推奨）
+    let width: CGFloat
+
+    /// 余白（画面端にめり込まない）
+    let margin: CGFloat
+
+    /// ヘッダーの高さ（持ち手）
+    let headerHeight: CGFloat
+
+    /// 位置（center）
+    @Binding var position: CGPoint
+
+    @ViewBuilder var header: () -> Header
+    @ViewBuilder var content: () -> Content
+
+    // 中身の計測値
+    @State private var contentHeight: CGFloat = 0
+    
+    @State private var didInitPosition = false
+
+    // ドラッグ中の一時オフセット（これが “ピタ追従” のコツ）
+    @GestureState private var dragOffset: CGSize = .zero
+
+    var body: some View {
+        let panelSize = computedPanelSize()
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
+        ZStack {
+            // Materialは外側に1枚だけ
+            shape.fill(.ultraThinMaterial)
+
+            VStack(spacing: 0) {
+                header()
+                    .frame(height: headerHeight)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture(panelSize: panelSize))
+                    .overlay(divider, alignment: .bottom)
+
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+                    .readHeight { h in
+                        let rounded = (h * 2).rounded() / 2
+                        if abs(contentHeight - rounded) > 0.5 {
+                            contentHeight = rounded
+                        }
+                    }
+            }
+        }
+        .frame(width: panelSize.width, height: panelSize.height)
+        .clipShape(shape)  // これで上下も完全に枠と一致
+        .overlay(shape.stroke(.white.opacity(0.15), lineWidth: 1))
+        .position(position)
+        .offset(dragOffset)
+        .onAppear {
+            guard !didInitPosition else { return }
+            didInitPosition = true
+            position = clamp(position, panelSize: panelSize)
+        }
+        .onChange(of: panelSize.height) {
+            // 初期化済みなら追従（リサイズで画面外に出ないため）
+            guard didInitPosition else { return }
+            position = clamp(position, panelSize: panelSize)
+        }
+    }
+
+    private var divider: some View {
+        Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+    }
+
+    private func computedPanelSize() -> CGSize {
+        // ヘッダー + 中身 + padding(上下8*2)
+        let rawHeight = headerHeight + contentHeight + 16
+
+        // 画面に収まるよう最大値を制限（スクロール無しの限界）
+        let maxH = max(80, containerSize.height - margin * 2)
+        let h = min(rawHeight, maxH)
+
+        return CGSize(width: width, height: h)
+    }
+
+    private func dragGesture(panelSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .updating($dragOffset) { value, state, _ in
+                // 指への追従はここで（描画コストが軽い）
+                state = value.translation
+            }
+            .onEnded { value in
+                // 確定は最後に一回だけ（遅れ・ふわつき激減）
+                let newPos = CGPoint(
+                    x: position.x + value.translation.width,
+                    y: position.y + value.translation.height
+                )
+                position = clamp(newPos, panelSize: panelSize)
+            }
+    }
+
+    private func clamp(_ p: CGPoint, panelSize: CGSize) -> CGPoint {
+        var x = p.x
+        var y = p.y
+
+        let halfW = panelSize.width / 2
+        let halfH = panelSize.height / 2
+
+        x = max(margin + halfW, min(containerSize.width - margin - halfW, x))
+        y = max(margin + halfH, min(containerSize.height - margin - halfH, y))
+
+        return CGPoint(x: x, y: y)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/ToolBar/OperationPhoneBottomBar.swift
+----------------------------------------
+import SwiftUI
+
+struct OperationPhoneBottomBar: View {
+    @Binding var interactionMode: InteractionMode
+    @Binding var presentedPanel: PanelRoute?
+
+    var onUploadImage: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Divider().opacity(0.2)
+
+            HStack(spacing: 10) {
+                content
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+        }
+        .background(.ultraThinMaterial)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch interactionMode {
+        case .normal:
+            pill("未確認", "list.bullet") { presentedPanel = .unconfirmedParts }
+            pill("リンク", "link") { presentedPanel = .linkProjects }
+            pill("メモ", "note.text") { presentedPanel = .memo }
+            Spacer()
+
+        case .drawing:
+            pill("ツール", "slider.horizontal.3") { presentedPanel = .drawingTools }
+            pill("画像UP", "photo.on.rectangle") { onUploadImage() }
+            Spacer()
+
+        default:
+            Spacer()
+        }
+    }
+
+    private func pill(_ title: String, _ systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.secondary.opacity(0.10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/UI/ToolBar/OperationiPadTopBar.swift
+----------------------------------------
+import SwiftUI
+
+// ============================
+// OperationiPadTopBar（2段トップバー）
+// - 1段目: 共通（戻る/モード/Rect一覧/ResetZoom/scale）
+// - 2段目: モード別ショートカット + Key/IO
+// ============================
+
+struct OperationiPadTopBar: View {
+    @Binding var interactionMode: InteractionMode
+    let viewportScale: CGFloat
+
+    @Binding var isUnconfirmedPartsVisible: Bool
+
+    // 2段目で使いそうなやつ（必要に応じて増やす）
+    @Binding var isMemoVisible: Bool
+    @Binding var isLinkProjectsVisible: Bool
+    @Binding var isDrawingSettingsPanelVisible: Bool
+
+    var onBack: () -> Void
+    var onResetZoom: () -> Void
+    var onUploadImage: () -> Void
+    var onSaveLocal: () -> Void
+    var onLoadLocal: () -> Void
+    var onSavePhotos: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            // --------------------
+            // 1段目（共通）
+            // --------------------
+            HStack(spacing: 10) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.headline)
+                        .frame(width: 44, height: 34)
+                        .contentShape(Rectangle())
+                }
+
+                modeButton("確認モード", .normal)
+                modeButton("描画モード", .drawing)
+                modeButton("文字認識", .camera)
+
+                Spacer()
+
+                Button("ズームリセット") { onResetZoom() }
+
+                Text(String(format: "ズーム倍率: %.2f", viewportScale))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Button {
+                } label: {
+                    Label("強制終了", systemImage: "")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+
+            // --------------------
+            // 2段目（モード別）
+            // ※ 別Viewに切り出して型推論を軽くする
+            // --------------------
+            OperationiPadTopBarSecondRow(
+                interactionMode: $interactionMode,
+                isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
+                isMemoVisible: $isMemoVisible,
+                isLinkProjectsVisible: $isLinkProjectsVisible,
+                isSettingsPanelVisible: $isDrawingSettingsPanelVisible,
+                onUploadImage: onUploadImage,
+                onSaveLocal: onSaveLocal,
+                onLoadLocal: onLoadLocal,
+                onSavePhotos: onSavePhotos
+            )
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    // mode button（共通）
+    private func modeButton(_ title: String, _ mode: InteractionMode) -> some View {
+        Button { interactionMode = mode } label: {
+            Text(title)
+                .fontWeight(.semibold)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(interactionMode == mode ? Color.blue.opacity(0.25) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+}
+
+// ============================
+// 2段目（モード別）
+// ============================
+
+struct OperationiPadTopBarSecondRow: View {
+    @Binding var interactionMode: InteractionMode
+
+    @Binding var isUnconfirmedPartsVisible: Bool
+    @Binding var isMemoVisible: Bool
+    @Binding var isLinkProjectsVisible: Bool
+    @Binding var isSettingsPanelVisible: Bool
+
+    var onUploadImage: () -> Void
+    var onSaveLocal: () -> Void
+    var onLoadLocal: () -> Void
+    var onSavePhotos: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch interactionMode {
+        case .normal:
+            TogglePillButton(title: "未確認部材一覧", isOn: $isUnconfirmedPartsVisible, systemImage: "list.bullet")
+            TogglePillButton(title: "リンクプロジェクト一覧", isOn: $isLinkProjectsVisible, systemImage: "link")
+            TogglePillButton(title: "メモ", isOn: $isMemoVisible, systemImage: "note.text")
+            
+            Spacer()
+
+        case .drawing:
+            TogglePillButton(title: "ツール選択", isOn: $isSettingsPanelVisible, systemImage: "slider.horizontal.3")
+            Button {
+                onUploadImage()
+            } label: {
+                Label("画像アップロード", systemImage: "photo.on.rectangle")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.secondary.opacity(0.10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        default:
+            Spacer()
+        }
+    }
+}
+
+// ============================
+// Preview
+// ============================
+
+#Preview {
+    struct _PreviewHost: View {
+        @State var interactionMode: InteractionMode = .normal
+        @State var isRectListVisible = false
+        @State var isUnconfirmedPartsVisible = false
+        @State var isMemoVisible = false
+        @State var isLinkProjectsVisible = false
+        @State var isDrawingSettingsPanelVisible = false
+        @State var imageKey = "sample1"
+        @State var drawingKey = "v1"
+
+        var body: some View {
+            OperationiPadTopBar(
+                interactionMode: $interactionMode,
+                viewportScale: 1.23,
+                isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
+                isMemoVisible: $isMemoVisible,
+                isLinkProjectsVisible: $isLinkProjectsVisible,
+                isDrawingSettingsPanelVisible: $isDrawingSettingsPanelVisible,
+                onBack: {},
+                onResetZoom: {},
+                onUploadImage: {},
+                onSaveLocal: {},
+                onLoadLocal: {},
+                onSavePhotos: {}
+            )
+            .padding()
+        }
+    }
+
+    return _PreviewHost()
+}
+
+
+ZoomPanDrawingPlaygound/UI/ToolBar/OperationPhoneTopBar.swift
+----------------------------------------
+import SwiftUI
+
+struct OperationPhoneTopBar: View {
+    @Binding var interactionMode: InteractionMode
+    let viewportScale: CGFloat
+
+    var onBack: () -> Void
+    var onResetZoom: () -> Void
+    var onForceQuit: () -> Void
+
+    var body: some View {
+        HStack() {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.headline)
+                    .frame(width: 44, height: 34)
+                    .contentShape(Rectangle())
+            }
+
+            modeButton("確認", .normal)
+            modeButton("描画", .drawing)
+            modeButton("文字認識", .camera)
+
+            Spacer()
+
+            Button("リセット") { onResetZoom() }
+
+            Button(action: onForceQuit) {
+                Text("強制終了")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.red.opacity(0.10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func modeButton(_ title: String, _ mode: InteractionMode) -> some View {
+        Button { interactionMode = mode } label: {
+            Text(title)
+                .fontWeight(.semibold)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(interactionMode == mode ? Color.blue.opacity(0.25) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/LoadedImage.swift
+----------------------------------------
+import Foundation
+import UIKit
+
+/// 作業用の画像のデータ保持用構造体
+/// - URL からダウンロードして UIImage にする
+/// - name は URL の lastPathComponent を基本に、変なら自前生成
+struct LoadedImage: Sendable {
+    let name: String
+    let image: UIImage
+    let url: URL
+
+    init(url: URL) async throws {
+        self.url = url
+
+        //  URLから画像ダウンロード
+        //    - ここで throw されるので呼び出し側は do-catch できる
+        let (data, resp) = try await URLSession.shared.data(from: url)
+
+        // ステータス確認（画像直URLなら 200 以外は基本おかしい）
+        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
+
+        //  UIImage化（失敗したらdecode不能）
+        guard let image = UIImage(data: data) else {
+            throw URLError(.cannotDecodeContentData)
+        }
+
+        self.image = image
+
+        //  ファイル名
+        let raw = url.lastPathComponent
+        if raw.isEmpty || !raw.contains(".") {
+            self.name = "image_\(UUID().uuidString).png"
+        } else {
+            self.name = raw
+        }
+    }
+
+    ///  初期値用（全部""でいい、という要望に合わせて “空のダミー” を用意）
+    /// - image は必要なので 1x1 の透明画像を入れる
+    static let initial: LoadedImage = {
+        let size = CGSize(width: 1, height: 1)
+        UIGraphicsBeginImageContextWithOptions(size, false, 0)
+        defer { UIGraphicsEndImageContext() }
+        let img = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+        return LoadedImage(
+            name: "",
+            image: img,
+            url: URL(string: "about:blank")!
+        )
+    }()
+
+    // private init（initial用）
+    private init(name: String, image: UIImage, url: URL) {
+        self.name = name
+        self.image = image
+        self.url = url
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/ViewModel/ProjectVM.swift
+----------------------------------------
+import Foundation
+import YamatoAPIKit
+import UIKit
+
+struct ProjectVM: Identifiable, Sendable {
+    let id: String
+    var name: String
+
+    // 毎回更新されるURL群（DTO由来）
+    var thumbnailURL: URL?
+    var pipeListURL: URL?
+    var memoURL: URL?
+
+    // それに紐づく毎回更新されるデータ
+    var loadedThumb: LoadedImage?
+    var memoText: String?
+
+    // その他DTO情報（必要なら）
+    var instructionNumbers: [String]
+    var linkIDs: [String]
+    var checkbackUserGeneral: String?
+    var checkbackAtGeneral: Date?
+    var checkbackUserCenter: String?
+    var checkbackAtCenter: Date?
+
+    init(dto: ProjectDTO) {
+        self.id = dto.id
+        self.name = dto.name
+        self.thumbnailURL = dto.thumbnailURL
+        self.pipeListURL = dto.pipeListURL
+        self.memoURL = dto.memoURL
+
+        self.loadedThumb = nil
+        self.memoText = nil
+
+        self.instructionNumbers = dto.instructionNumbers
+        self.linkIDs = dto.linkIDs
+        self.checkbackUserGeneral = dto.checkbackUserGeneral
+        self.checkbackAtGeneral = dto.checkbackAtGeneral
+        self.checkbackUserCenter = dto.checkbackUserCenter
+        self.checkbackAtCenter = dto.checkbackAtCenter
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/ViewModel/OperationScreenModel.swift
+----------------------------------------
+import Foundation
+import YamatoAPIKit
+import DrawingKit
+import Combine
+import UIKit
+
+/// Operation画面の「データ層」
+///
+/// ここに置くもの（＝なぜここなのか）
+/// - ネットワーク取得（リンクプロジェクト一覧 / サムネ / メモ / pipeList）
+/// - entry画像の固定キャッシュ（画面中ずっと同じ画像を使う要件）
+/// - pipeList を CanvasRect に変換し「全プロジェクト分を統合した結果」を作る
+///
+/// ここに置かないもの
+/// - パネル表示状態・モード・選択状態などの「UI状態」
+/// - タップやズームなど「ユーザー操作起点の状態遷移」
+///
+/// 理由：
+/// - Viewから通信を剥がして、テスト・再利用・責務分離をしやすくするため
+/// - StoreがUIルールを持ち、Modelがデータルールを持つため
+@MainActor
+final class OperationScreenModel: ObservableObject {
+
+    // MARK: - External dependency
+
+    /// APIアクセス等のサービス群（通信はここに集約）
+    private let services: YamatoServices
+
+    // MARK: - Fixed inputs (screen lifetime)
+
+    /// entryプロジェクト（＝ユーザーが最初に開いたプロジェクト）
+    let entryProjectID: String
+
+    /// entryプロジェクトの「ユーザーが指定した画像URL」
+    /// 画面中は固定で扱う（リンクプロジェクトを開いても entry画像は変わらない）
+    let selectedImageURL: URL
+
+    // MARK: - Output state (for UI)
+
+    /// リンクプロジェクト一覧（thumb/memo等を含むView向けVM）
+    @Published private(set) var projects: [ProjectVM] = []
+
+    /// ✅ 要件：どのプロジェクトを開いていても全rectを参照できる
+    /// 全プロジェクト分の pipeList を CanvasRect に変換し、統合した結果
+    @Published private(set) var allRects: [CanvasRect] = []
+
+    @Published private(set) var isLoading: Bool = false
+    @Published var errorMessage: String? = nil
+
+    // MARK: - Init
+
+    init(services: YamatoServices, entryProjectID: String, selectedImageURL: URL) {
+        self.services = services
+        self.entryProjectID = entryProjectID
+        self.selectedImageURL = selectedImageURL
+    }
+
+    // MARK: - Public API
+
+    /// 画面復帰のたびに呼ぶ：リンクプロジェクト一覧を毎回最新化
+    ///
+    /// ルール：
+    /// - entry画像は固定（selectedImageURLでロック＋キャッシュ）
+    /// - entry以外の thumb/memo/pipeList は毎回ダウンロード（最新を優先）
+    /// - pipeList は全件まとめて rect化して allRects に統合
+    func refresh(currentProjectID: String) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            // 1) 一覧は毎回最新版取得（リンク関係が変わる可能性があるため）
+            let dtos = try await services.operation.fetchAllLinkProjects(projcet_id: currentProjectID)
+
+            // 2) DTO -> VM（URL群はここで毎回 “最新” に更新）
+            var next = dtos.map(ProjectVM.init(dto:))
+
+            // 3) entry画像は固定（selectedImageURLから作り、キャッシュがあれば利用）
+            let entryImage = try await lockedEntryImage()
+            if let idx = next.firstIndex(where: { $0.id == entryProjectID }) {
+                next[idx].loadedThumb = entryImage
+            }
+
+            // 4) entry以外の thumb/memo をダウンロードしてVMを enrich
+            //    - 失敗しても一覧自体は出したいので、個別失敗は握り潰す
+            next = await enrichProjects(next)
+
+            // 5) pipeList -> CanvasRect 統合（全プロジェクト分）
+            //    - 「どのプロジェクトを開いていても全rect参照」要件のため、ここで統合する
+            let rects = await buildAllRects(from: next)
+
+            // 6) state反映
+            self.projects = next
+            self.allRects = rects
+
+        } catch {
+            self.errorMessage = "リンクプロジェクト一覧の取得に失敗しました: \(error)"
+        }
+    }
+
+    // MARK: - Entry image lock (cache)
+
+    /// entry画像は画面中ずっと固定
+    /// - 画面復帰のたびに同じ画像を再DLしないためキャッシュする
+    /// - entryProjectID をキーに保持
+    func lockedEntryImage() async throws -> LoadedImage {
+        if let cached = ImageCache.shared.entryImage(for: entryProjectID) {
+            return cached
+        }
+        let img = try await LoadedImage(url: selectedImageURL)
+        ImageCache.shared.setEntryImage(img, for: entryProjectID)
+        return img
+    }
+
+    // MARK: - Enrich (thumb / memo)
+
+    /// entry以外の thumb/memo を取得して ProjectVM を更新する
+    ///
+    /// なぜここ？
+    /// - 「データを揃える」処理なのでModel側が持つ（Storeに置くとUI責務と混ざりやすい）
+    private func enrichProjects(_ projects: [ProjectVM]) async -> [ProjectVM] {
+        var next = projects
+
+        // NOTE:
+        // thumb/memo を全部同時並列にするとネットワークが細い環境で詰まりやすいので、
+        // ここでは段階的（thumb → memo）にしている。
+        next = await downloadThumbs(projects: next)
+        next = await downloadMemos(projects: next)
+        return next
+    }
+
+    private func downloadThumbs(projects: [ProjectVM]) async -> [ProjectVM] {
+        var next = projects
+
+        await withTaskGroup(of: (Int, LoadedImage?).self) { group in
+            for i in next.indices {
+                // entryは固定なのでスキップ
+                if next[i].id == entryProjectID { continue }
+                guard let url = next[i].thumbnailURL else { continue }
+
+                group.addTask {
+                    do {
+                        let img = try await LoadedImage(url: url)
+                        return (i, img)
+                    } catch {
+                        return (i, nil)
+                    }
+                }
+            }
+
+            for await (i, img) in group {
+                next[i].loadedThumb = img
+            }
+        }
+
+        return next
+    }
+
+    private func downloadMemos(projects: [ProjectVM]) async -> [ProjectVM] {
+        var next = projects
+
+        await withTaskGroup(of: (Int, String?).self) { group in
+            for i in next.indices {
+                guard let url = next[i].memoURL else { continue }
+
+                // TaskGroup内はSendable制約があるので、必要な値だけコピーして渡す
+                let pid = next[i].id
+                let pname = next[i].name
+
+                group.addTask {
+                    do {
+                        let text = try await self.downloadText(
+                            url: url,
+                            projectID: pid,
+                            projectName: pname
+                        )
+                        return (i, text)
+                    } catch {
+                        return (i, nil)
+                    }
+                }
+            }
+
+            for await (i, text) in group {
+                next[i].memoText = text
+            }
+        }
+
+        return next
+    }
+
+    // MARK: - Rect unify (pipeList -> CanvasRect)
+
+    /// pipeListURL を全プロジェクト分DL → rect化 → 1配列に統合
+    ///
+    /// なぜここ？
+    /// - これは「データの統合結果」を作る処理で、UI状態とは独立
+    /// - Storeが「どれを表示するか」を決め、Modelが「全件を作る」
+    private func buildAllRects(from projects: [ProjectVM]) async -> [CanvasRect] {
+        typealias PipeListResult = (projectID: String, projectName: String, items: [PipeItemDTO])
+
+        var merged: [CanvasRect] = []
+        merged.reserveCapacity(projects.count * 50)
+
+        await withTaskGroup(of: PipeListResult.self) { group in
+            for p in projects {
+                guard let url = p.pipeListURL else { continue }
+
+                // ✅ TaskGroupへ渡すのはSendableな値だけ（id/name/URL）
+                let pid = p.id
+                let pname = p.name
+
+                group.addTask { [url] in
+                    do {
+                        let resp = try await self.downloadPipeList(url: url)
+                        return (pid, pname, resp.pipeList)
+                    } catch {
+                        // 失敗は握り潰す：一覧UIを壊さない
+                        return (pid, pname, [])
+                    }
+                }
+            }
+
+            // CanvasRect化はMainActor側で（DrawingKitの型をTask内で弄らない方が安全）
+            for await r in group {
+                let rects = PipeListMapper.toCanvasRects(
+                    r.items,
+                    projectID: r.projectID,
+                    projectName: r.projectName
+                )
+                merged.append(contentsOf: rects)
+            }
+        }
+
+        return merged
+    }
+
+    // MARK: - Networking utilities
+
+    /// メモ（テキスト）を取得
+    /// - Dummy URL を扱う都合でModelに置く（View/Store側に分散させない）
+    private func downloadText(url: URL, projectID: String? = nil, projectName: String? = nil) async throws -> String {
+
+        // ダミーメモ対応（UIプレビュー/オフライン動作確認用）
+        if url.scheme == "app", url.host == "dummy" {
+            return DummyMemoFactory.makeText(
+                projectID: projectID ?? "UNKNOWN",
+                projectName: projectName ?? "不明プロジェクト"
+            )
+        }
+
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 10
+        let (data, resp) = try await URLSession.shared.data(for: req)
+
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// pipeList（JSON）を取得してDTOにデコード
+    private func downloadPipeList(url: URL) async throws -> PipeListResponseDTO {
+
+        // ダミーURL対応（UI確認用）
+        if url.scheme == "app", url.host == "dummy" {
+            let data = try DummyPipeListFactory.makeJSONData(
+                count: 10,
+                rectSize: CGSize(width: 36, height: 28)
+            )
+            return try Self.pipeListDecoder.decode(PipeListResponseDTO.self, from: data)
+        }
+
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 10
+        let (data, resp) = try await URLSession.shared.data(for: req)
+
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        return try Self.pipeListDecoder.decode(PipeListResponseDTO.self, from: data)
+    }
+
+    /// pipeListのDate形式が揺れる（fractional seconds有無）ため専用decoderを固定で持つ
+    /// - 毎回生成すると無駄なのでstaticにする
+    private static let pipeListDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { d in
+            let c = try d.singleValueContainer()
+            let s = try c.decode(String.self)
+
+            let f1 = ISO8601DateFormatter()
+            f1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let dt = f1.date(from: s) { return dt }
+
+            let f2 = ISO8601DateFormatter()
+            f2.formatOptions = [.withInternetDateTime]
+            if let dt = f2.date(from: s) { return dt }
+
+            throw DecodingError.dataCorruptedError(in: c, debugDescription: "Invalid date: \(s)")
+        }
+        return decoder
+    }()
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/IPadPanels.swift
+----------------------------------------
+import SwiftUI
+import DrawingKit
+import UIKit
+
+struct IPadPanels: View {
+
+    //  iPadパネルの横幅パラメータ
+    //  高さは自動計算
+    enum Layout {
+        // お絵描きツール選択パネル
+        static let drawingToolSelectPanelWidth: CGFloat = 320
+        // 未確認部材選択パネル
+        static let unconfirmedPartsPanelWidth: CGFloat = 360
+        //  メモパネル
+        static let memoPanelWidth: CGFloat = 360
+        //  リンクプロジェクトパネル
+        static let linkProjectsPanelWidth: CGFloat = 360
+    }
+
+    //  MARK: - 外部から受け取る
+    @ObservedObject var store: OperationStore
+    @Binding var canvas: DrawingCanvasView?
+
+    // 操作系はクロージャで注入（Panelsはルールを持たない）
+    let openProject: (_ projectID: String, _ zoomRect: CanvasRect?) -> Void
+    let setUnconfirmedPartsVisible: (_ visible: Bool) -> Void
+    let saveMergedToPhotos: (_ currentLoadedImage: LoadedImage) -> Void
+
+    var body: some View {
+        Group {
+            drawingSettingPanelLayer
+            unconfirmedPartsPanelLayer
+            memoPanelLayer
+            linkProjectsPanelLayer
+        }
+    }
+
+    @ViewBuilder
+    private var drawingSettingPanelLayer: some View {
+        if store.interactionMode == .drawing && store.isDrawingSettingsPanelVisible {
             GeometryReader { proxy in
                 CommonFloatingPanel(
                     kind: .drawing,
                     containerSize: proxy.size,
-                    width: panelWidth,
+                    width: Layout.drawingToolSelectPanelWidth,
                     margin: 12,
                     headerHeight: 44,
-                    title: "書き込みモード",
-                    onClose: { interactionMode = .normal },
+                    title: "ツール選択",
+                    onClose: { store.isDrawingSettingsPanelVisible = false },
                     trailing: { AnyView(EmptyView()) },
-                    position: $panelPos,
-                    didInitPosition: $didInitPanelPos
+                    position: $store.panelPos,
+                    didInitPosition: $store.didInitPanelPos
                 ) {
                     DrawingModePanel(
                         drawMode: toolBinding,
@@ -169,7 +1677,7 @@ extension OperationScreen {
                         eraserRadius: eraserRadiusBinding,
                         onUndo: { canvas?.undo() },
                         onRedo: { canvas?.redo() },
-                        onSave: { saveMergedToPhotos() }
+                        onSave: { saveMergedToPhotos(store.currentLoadedImage) }
                     )
                     .padding(.horizontal, 12)
                 }
@@ -179,64 +1687,61 @@ extension OperationScreen {
     }
 
     @ViewBuilder
-    var rectListPanelLayer: some View {
-        if isRectListVisible {
+    private var unconfirmedPartsPanelLayer: some View {
+        if store.isUnconfirmedPartsVisible {
             GeometryReader { proxy in
                 CommonFloatingPanel(
-                    kind: .rectList,
+                    kind: .unconfirmedParts,
                     containerSize: proxy.size,
-                    width: rectListPanelWidth,
-                    margin: 12,
-                    headerHeight: 44,
-                    title: "Rect一覧（overlay）",
-                    onClose: { isRectListVisible = false },
-                    trailing: { AnyView(EmptyView()) },
-                    position: $rectListPanelPos,
-                    didInitPosition: $didInitRectListPanelPos
-                ) {
-                    rectListPanelContent
-                        .padding(.horizontal, 12)
-                }
-            }
-            .ignoresSafeArea()
-        }
-    }
-    
-    @ViewBuilder
-    var unconfirmedPartsPanelLayer: some View {
-        if isUnconfirmedPartsVisible {
-            GeometryReader { proxy in
-                CommonFloatingPanel(
-                    kind: .rectList, // 専用kindが無いなら一旦これでOK（できれば .unconfirmed を増やす）
-                    containerSize: proxy.size,
-                    width: unconfirmedPartsPanelWidth,
+                    width: Layout.unconfirmedPartsPanelWidth,
                     margin: 12,
                     headerHeight: 44,
                     title: "未確認部材一覧",
-                    onClose: { isUnconfirmedPartsVisible = false },
+                    onClose: { setUnconfirmedPartsVisible(false) },
                     trailing: { AnyView(EmptyView()) },
-                    position: $unconfirmedPartsPanelPos ,
-                    didInitPosition: $didInitUnconfirmedPartsPanelPos
+                    position: $store.unconfirmedPartsPanelPos,
+                    didInitPosition: $store.didInitUnconfirmedPartsPanelPos
                 ) {
                     UnconfirmedPartsPanelView(
-                        rects: overlayRects.filter { !$0.isHidden && !$0.isChecked },
-                        selectedRectIDs: $selectedRectIDs,
+                        rects: store.overlayRects.filter { !$0.isHidden && !$0.isChecked },
+                        selectedRectIDs: $store.selectedRectIDs,
                         onZoom: { rect in
                             let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
-                            zoomRequest = .set(
-                                scale: max(viewportState.scale, 2.0),
+                            store.zoomRequest = .set(
+                                scale: max(store.viewportState.scale, 2.0),
                                 centerInImage: c
                             )
                         },
-                        onCameraCheckback: { selected in
-                            // 必要なら
-                        },
-                        onOpenProject: { pid,rect in
-                            openProject(projectID: pid,zoomRect: rect)
-                        },
+                        onCameraCheckback: { _ in },
+                        onOpenProject: { pid, rect in openProject(pid, rect) }
                     )
-                    .frame(
-                        minHeight: proxy.size.height * 2.0 / 3.0
+                    .frame(minHeight: proxy.size.height * 2.0 / 3.0)
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    @ViewBuilder
+    private var memoPanelLayer: some View {
+        if store.isMemoVisible {
+            GeometryReader { proxy in
+                CommonFloatingPanel(
+                    kind: .memo,
+                    containerSize: proxy.size,
+                    width: Layout.memoPanelWidth,
+                    margin: 12,
+                    headerHeight: 44,
+                    title: "メモ",
+                    onClose: { store.isMemoVisible = false },
+                    trailing: { AnyView(EmptyView()) },
+                    position: $store.memoPanelPos,
+                    didInitPosition: $store.didInitMemoPanelPos
+                ) {
+                    MemoPanelView(
+                        text: $store.memoText,
+                        onSave: { /* saveMemo */ },
+                        onDiscard: { store.memoText = ""; store.isMemoVisible = false }
                     )
                 }
             }
@@ -244,212 +1749,697 @@ extension OperationScreen {
         }
     }
 
+    @ViewBuilder
+    private var linkProjectsPanelLayer: some View {
+        if store.isLinkProjectsVisible {
+            GeometryReader { proxy in
+                CommonFloatingPanel(
+                    kind: .linkProjects,
+                    containerSize: proxy.size,
+                    width: Layout.linkProjectsPanelWidth,
+                    margin: 12,
+                    headerHeight: 50,
+                    title: "リンクプロジェクトリスト",
+                    onClose: { store.isLinkProjectsVisible = false },
+                    trailing: { AnyView(EmptyView()) },
+                    position: $store.linkProjectsPos,
+                    didInitPosition: $store.didInitLinkProjectsPanelPos
+                ) {
+                    LinkProjectsPanelView(items: store.linkProjectItems) { selected in
+                        openProject(selected.id, nil)
+                    }
+                    .frame(minHeight: proxy.size.height * 2.0 / 4.0)
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+RectListPanel.swift
+//  MARK: - DrawingSetting(お絵描き機能)のパラメータを単体で変更できるバインディングを作成する
+//  変更対象のDrawingSettingはStoreに入っている
+extension IPadPanels{
+    var toolBinding: Binding<DrawMode> {
+        Binding(
+            get: { store.drawingSettings.tool },
+            set: { store.drawingSettings.tool = $0 }
+        )
+    }
+
+    var stampKindBinding: Binding<StampKind> {
+        Binding(
+            get: { store.drawingSettings.stamp.kind },
+            set: { store.drawingSettings.stamp.kind = $0 }
+        )
+    }
+
+    /// 「今アクティブな色」
+    /// - stamp中は stamp.color
+    /// - それ以外は pen.color
+    var activeColorBinding: Binding<Color> {
+        Binding(
+            get: {
+                switch store.drawingSettings.tool {
+                case .stamp:
+                    return store.drawingSettings.stamp.color
+                default:
+                    return store.drawingSettings.pen.color
+                }
+            },
+            set: { newValue in
+                switch store.drawingSettings.tool {
+                case .stamp:
+                    store.drawingSettings.stamp.color = newValue
+                default:
+                    store.drawingSettings.pen.color = newValue
+                }
+            }
+        )
+    }
+
+    /// 「今アクティブなサイズ」
+    /// - stamp中は stamp.size
+    /// - それ以外は pen.width
+    var activeSizeBinding: Binding<CGFloat> {
+        Binding(
+            get: {
+                switch store.drawingSettings.tool {
+                case .stamp:
+                    return store.drawingSettings.stamp.size
+                default:
+                    return store.drawingSettings.pen.width
+                }
+            },
+            set: { newValue in
+                switch store.drawingSettings.tool {
+                case .stamp:
+                    store.drawingSettings.stamp.size = newValue
+                default:
+                    store.drawingSettings.pen.width = newValue
+                }
+            }
+        )
+    }
+
+    /// 「今アクティブな不透明度」
+    /// - stamp中は stamp.opacity
+    /// - それ以外は pen.opacity
+    var activeOpacityBinding: Binding<CGFloat> {
+        Binding(
+            get: {
+                switch store.drawingSettings.tool {
+                case .stamp:
+                    return store.drawingSettings.stamp.opacity
+                default:
+                    return store.drawingSettings.pen.opacity
+                }
+            },
+            set: { newValue in
+                switch store.drawingSettings.tool {
+                case .stamp:
+                    store.drawingSettings.stamp.opacity = newValue
+                default:
+                    store.drawingSettings.pen.opacity = newValue
+                }
+            }
+        )
+    }
+
+    var eraserRadiusBinding: Binding<CGFloat> {
+        Binding(
+            get: { store.drawingSettings.eraser.radius },
+            set: { store.drawingSettings.eraser.radius = $0 }
+        )
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/Config/OperationConfigView.swift
 ----------------------------------------
-import DrawingKit
 import SwiftUI
 
-extension OperationScreen {
+struct OperationConfigView: View {
 
-    var rectListPanelContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    @ObservedObject private var store = OperationConfigStore.shared
 
-            HStack {
-                Text("count: \(overlayRects.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    /// 編集中のドラフト（保存ボタンで確定）
+    @State private var draft: OperationConfig = .default
 
-                Spacer()
+    var onClose: () -> Void = {}
 
-                Button("全部クリア") {
-                    overlayRects.removeAll()
-                    selectedRectIDs.removeAll()
-                }
-            }
+    var body: some View {
+        NavigationStack {
+            Form {
+                selectionSection
+                checkedSection
+                unconfirmedSection
+                panelWidthSection
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    if overlayRects.isEmpty {
-                        Text("Rectがありません")
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 8)
-                    } else {
-                        ForEach(Array(overlayRects.enumerated()), id: \.element.id) { index, item in
-                            rectRow(index: index, rect: item)
-                        }
+                Section {
+                    Button(role: .destructive) {
+                        store.resetToDefault()
+                        draft = store.config
+                    } label: {
+                        Text("デフォルトに戻す")
                     }
                 }
-                .padding(.vertical, 4)
             }
-            .frame(minHeight: 200, maxHeight: 400)
-        }
-    }
-
-    @ViewBuilder
-    func rectRow(index: Int, rect: CanvasRect) -> some View {
-        let isSelected = selectedRectIDs.contains(rect.id)
-        let isDisabled = rect.isHidden || rect.isChecked
-
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
-
-                Text(rect.name.isEmpty ? "（名称未設定）" : rect.name)
-                    .font(.subheadline)
-                    .fontWeight(isSelected ? .bold : .regular)
-                    .lineLimit(1)
-                    .opacity(isDisabled ? 0.45 : 1.0)
-
-                Spacer()
-
-                if rect.isHidden {
-                    Text("非表示")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .navigationTitle("Operation設定")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { onClose() }
                 }
-
-                if rect.isChecked {
-                    Text("確認済")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.blue)
-                }
-
-                Button("Zoom") {
-                    let center = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
-                    let targetScale = max(viewportState.scale, 2.0)
-                    zoomRequest = .set(scale: targetScale, centerInImage: center)
-                }
-
-                Button(role: .destructive) {
-                    overlayRects.removeAll { $0.id == rect.id }
-                    selectedRectIDs.remove(rect.id)
-                } label: {
-                    Image(systemName: "trash")
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        store.update(draft)
+                        onClose()
+                    }
+                    .fontWeight(.semibold)
                 }
             }
-
-            HStack(spacing: 8) {
-                if let ext = rect.externalID {
-                    Text(ext)
-                }
-                Text(rectSummary(rect.rect))
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-            // ✅ 一覧側操作（表示/チェックのトグルを入れたいならここに追加しやすい）
-            HStack(spacing: 10) {
-                Button(rect.isHidden ? "表示" : "非表示") {
-                    toggleHidden(rectID: rect.id)
-                }
-                Button(rect.isChecked ? "未確認" : "確認済") {
-                    toggleChecked(rectID: rect.id)
-                }
-                Spacer()
-            }
-            .font(.caption.weight(.semibold))
-
-            Divider().opacity(0.2)
-        }
-        .padding(.vertical, 6)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // ✅ 非表示/確認済はタップで選択させない
-            guard !isDisabled else { return }
-
-            if isSelected {
-                selectedRectIDs.remove(rect.id)
-            } else {
-                selectedRectIDs.insert(rect.id)
+            .onAppear {
+                draft = store.config
             }
         }
     }
 
-    func rectSummary(_ r: CGRect) -> String {
-        String(
-            format: "x: %.1f  y: %.1f  w: %.1f  h: %.1f",
-            r.origin.x, r.origin.y, r.size.width, r.size.height)
-    }
+    // MARK: - Sections
 
-    // MARK: - list operations
+    private var selectionSection: some View {
+        Section("選択済み矩形") {
+            colorRow("線の色", color: $draft.selection.strokeColor)
+            sliderRow("線の透明度", value: $draft.selection.strokeAlpha, range: 0...1, format: "%.2f")
+            sliderRow("線の太さ", value: $draft.selection.strokeWidth, range: 1...10, format: "%.0f")
 
-    func toggleHidden(rectID: UUID) {
-        guard let idx = overlayRects.firstIndex(where: { $0.id == rectID }) else { return }
-        overlayRects[idx].isHidden.toggle()
-
-        // 非表示にしたら選択も解除（仕様）
-        if overlayRects[idx].isHidden {
-            selectedRectIDs.remove(rectID)
+            Toggle("背景を塗る", isOn: $draft.selection.fillEnabled)
+            colorRow("背景の色", color: $draft.selection.fillColor)
+                .disabled(!draft.selection.fillEnabled)
+            sliderRow("背景の透明度", value: $draft.selection.fillAlpha, range: 0...1, format: "%.2f")
+                .disabled(!draft.selection.fillEnabled)
         }
     }
 
-    func toggleChecked(rectID: UUID) {
-        guard let idx = overlayRects.firstIndex(where: { $0.id == rectID }) else { return }
-        overlayRects[idx].isChecked.toggle()
+    private var checkedSection: some View {
+        Section("チェック済み矩形（常時表示）") {
+            colorRow("線の色", color: $draft.checked.strokeColor)
+            sliderRow("線の透明度", value: $draft.checked.strokeAlpha, range: 0...1, format: "%.2f")
+            sliderRow("線の太さ", value: $draft.checked.strokeWidth, range: 1...10, format: "%.0f")
 
-        // 確認済にしたら選択も解除（仕様）
-        if overlayRects[idx].isChecked {
-            selectedRectIDs.remove(rectID)
+            Toggle("背景を塗る", isOn: $draft.checked.fillEnabled)
+            colorRow("背景の色", color: $draft.checked.fillColor)
+                .disabled(!draft.checked.fillEnabled)
+            sliderRow("背景の透明度", value: $draft.checked.fillAlpha, range: 0...1, format: "%.2f")
+                .disabled(!draft.checked.fillEnabled)
+        }
+    }
+
+    private var unconfirmedSection: some View {
+        Section("未確認矩形（一覧ONの時だけ）") {
+            colorRow("線の色", color: $draft.unconfirmed.strokeColor)
+            sliderRow("線の透明度", value: $draft.unconfirmed.strokeAlpha, range: 0...1, format: "%.2f")
+            sliderRow("線の太さ", value: $draft.unconfirmed.strokeWidth, range: 1...10, format: "%.0f")
+
+            Toggle("背景を塗る", isOn: $draft.unconfirmed.fillEnabled)
+            colorRow("背景の色", color: $draft.unconfirmed.fillColor)
+                .disabled(!draft.unconfirmed.fillEnabled)
+            sliderRow("背景の透明度", value: $draft.unconfirmed.fillAlpha, range: 0...1, format: "%.2f")
+                .disabled(!draft.unconfirmed.fillEnabled)
+        }
+    }
+
+    private var panelWidthSection: some View {
+        Section("パネル横幅（iPad）") {
+            sliderRow("ツール選択", value: $draft.panels.drawingTools, range: 240...520, format: "%.0f")
+            sliderRow("未確認部材", value: $draft.panels.unconfirmedParts, range: 260...600, format: "%.0f")
+            sliderRow("メモ", value: $draft.panels.memo, range: 260...600, format: "%.0f")
+            sliderRow("リンク", value: $draft.panels.linkProjects, range: 260...600, format: "%.0f")
+        }
+    }
+
+    // MARK: - UI Parts
+
+    private func colorRow(_ title: String, color: Binding<HexColor>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            ColorPicker(
+                "",
+                selection: color.asColorBindingLossy(),
+                supportsOpacity: false // 透明度は別スライダーで管理
+            )
+            .labelsHidden()
+        }
+    }
+
+    private func sliderRow(
+        _ title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        format: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(title): \(String(format: format, value.wrappedValue))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Slider(value: value, in: range)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/Config/OperationConfig.swift
+----------------------------------------
+import Foundation
+import CoreGraphics
+
+/// Operation 画面のユーザー設定
+struct OperationConfig: Codable, Equatable, Sendable {
+
+    struct SelectionStyle: Codable, Equatable, Sendable {
+        var strokeColor: HexColor = .init(hex: "#00C853") // green-ish
+        var strokeAlpha: Double = 1.0
+        var strokeWidth: Double = 4
+
+        var fillColor: HexColor = .init(hex: "#00C853")
+        var fillAlpha: Double = 0.18
+        var fillEnabled: Bool = true
+    }
+
+    struct CheckedStyle: Codable, Equatable, Sendable {
+        var strokeColor: HexColor = .init(hex: "#1976D2") // blue
+        var strokeAlpha: Double = 1.0
+        var strokeWidth: Double = 2
+        var fillEnabled: Bool = false
+        var fillAlpha: Double = 0.0
+        var fillColor: HexColor = .init(hex: "#1976D2")
+    }
+
+    struct UnconfirmedStyle: Codable, Equatable, Sendable {
+        var strokeColor: HexColor = .init(hex: "#FBC02D") // yellow
+        var strokeAlpha: Double = 1.0
+        var strokeWidth: Double = 2
+
+        var fillColor: HexColor = .init(hex: "#FBC02D")
+        var fillAlpha: Double = 0.12
+        var fillEnabled: Bool = true
+    }
+
+    struct PanelWidths: Codable, Equatable, Sendable {
+        var drawingTools: Double = 320
+        var unconfirmedParts: Double = 360
+        var memo: Double = 360
+        var linkProjects: Double = 360
+    }
+
+    var selection: SelectionStyle = .init()
+    var checked: CheckedStyle = .init()
+    var unconfirmed: UnconfirmedStyle = .init()
+    var panels: PanelWidths = .init()
+
+    static let `default` = OperationConfig()
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/Config/OperationConfigStore.swift
+----------------------------------------
+import Foundation
+import Combine
+
+@MainActor
+public final class OperationConfigStore: ObservableObject {
+
+    public static let shared = OperationConfigStore()
+
+    @Published private(set) var config: OperationConfig = .default
+
+    private init() {
+        load()
+    }
+
+    // MARK: - Public API
+
+    func update(_ newValue: OperationConfig) {
+        config = newValue
+        save()
+    }
+
+    func resetToDefault() {
+        config = .default
+        save()
+    }
+
+    // MARK: - Persistence
+
+    private var fileURL: URL {
+        let fm = FileManager.default
+        let dir = (try? fm.url(for: .applicationSupportDirectory,
+                               in: .userDomainMask,
+                               appropriateFor: nil,
+                               create: true)) ?? fm.temporaryDirectory
+
+        let base = dir.appendingPathComponent("Config", isDirectory: true)
+        try? fm.createDirectory(at: base, withIntermediateDirectories: true)
+
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutable = base
+        try? mutable.setResourceValues(values)
+
+        return base.appendingPathComponent("operation_config.json")
+    }
+
+    private func load() {
+        let url = fileURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            config = .default
+            return
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            let decoded = try JSONDecoder().decode(OperationConfig.self, from: data)
+            config = decoded
+        } catch {
+            // 壊れてても UI を壊さない
+            config = .default
+        }
+    }
+
+    private func save() {
+        let url = fileURL
+        do {
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try enc.encode(config)
+            try data.write(to: url, options: [.atomic])
+        } catch {
+            // 失敗しても無視（UI継続）
         }
     }
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Actions.swift
+ZoomPanDrawingPlaygound/OperationScreen/Config/HexColor.swift
+----------------------------------------
+import Foundation
+import SwiftUI
+import UIKit
+
+/// Hex(#RRGGBB) を保存用に持つ軽量型
+struct HexColor: Codable, Equatable, Sendable {
+    var hex: String  // "#RRGGBB"
+
+    init(hex: String = "#FF0000") {
+        self.hex = HexColor.normalize(hex)
+    }
+
+    static func normalize(_ input: String) -> String {
+        var s = input.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if !s.hasPrefix("#") { s = "#\(s)" }
+        if s.count == 4 {
+            // #RGB -> #RRGGBB
+            let chars = Array(s)
+            s = "#\(chars[1])\(chars[1])\(chars[2])\(chars[2])\(chars[3])\(chars[3])"
+        }
+        if s.count != 7 { return "#000000" }
+        return s
+    }
+
+    var uiColor: UIColor {
+        UIColor(hex: hex) ?? .black
+    }
+
+    var swiftUIColor: Color {
+        Color(uiColor)
+    }
+}
+
+private extension UIColor {
+    convenience init?(hex: String) {
+        let s = HexColor.normalize(hex)
+        let hexPart = String(s.dropFirst())
+
+        guard hexPart.count == 6, let v = Int(hexPart, radix: 16) else { return nil }
+
+        let r = CGFloat((v >> 16) & 0xFF) / 255.0
+        let g = CGFloat((v >> 8) & 0xFF) / 255.0
+        let b = CGFloat(v & 0xFF) / 255.0
+
+        self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
+}
+
+extension Color {
+    /// 色空間ズレOK前提：ColorPicker で選んだ色を #RRGGBB に丸める
+    func toHexStringLossy() -> String {
+        let uiColor = UIColor(self)
+
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+
+        guard uiColor.getRed(&r, green: &g, blue: &b, alpha: &a) else {
+            return "#000000"
+        }
+
+        let ri = Int(round(r * 255))
+        let gi = Int(round(g * 255))
+        let bi = Int(round(b * 255))
+
+        return String(format: "#%02X%02X%02X", ri, gi, bi)
+    }
+}
+
+extension Binding where Value == HexColor {
+    /// HexColor <-> ColorPicker を繋ぐ
+    func asColorBindingLossy() -> Binding<Color> {
+        Binding<Color>(
+            get: { self.wrappedValue.swiftUIColor },
+            set: { newColor in
+                self.wrappedValue = HexColor(hex: newColor.toHexStringLossy())
+            }
+        )
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/StableUUID.swift
+----------------------------------------
+import Foundation
+import CryptoKit
+
+enum StableUUID {
+    /// 同じ input なら必ず同じ UUID を返す（SHA256の先頭16バイトを利用）
+    static func make(_ input: String) -> UUID {
+        let data = Data(input.utf8)
+        let hash = SHA256.hash(data: data)
+        let bytes = Array(hash) // 32 bytes
+
+        let uuidBytes: [UInt8] = Array(bytes.prefix(16))
+        let tuple: uuid_t = (
+            uuidBytes[0], uuidBytes[1], uuidBytes[2], uuidBytes[3],
+            uuidBytes[4], uuidBytes[5], uuidBytes[6], uuidBytes[7],
+            uuidBytes[8], uuidBytes[9], uuidBytes[10], uuidBytes[11],
+            uuidBytes[12], uuidBytes[13], uuidBytes[14], uuidBytes[15]
+        )
+        return UUID(uuid: tuple)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/PipeListDTO.swift
+----------------------------------------
+import Foundation
+import CoreGraphics
+
+//  pipe_list_url
+
+struct PipeListResponseDTO: Codable {
+    let pipeList: [PipeItemDTO]
+
+    enum CodingKeys: String, CodingKey {
+        case pipeList = "pipe_list"
+    }
+}
+
+struct PipeItemDTO: Codable {
+    let pipeCheckID: String
+    let pipeName: String
+    let checkbackInfo: CheckbackInfoDTO
+    let dxfRect: RectDTO
+    let imageRect: RectDTO
+
+    enum CodingKeys: String, CodingKey {
+        case pipeCheckID = "pipe_check_id"
+        case pipeName = "pipe_name"
+        case checkbackInfo = "checkback_info"
+        case dxfRect = "dxf_rect"
+        case imageRect = "image_rect"
+    }
+}
+
+struct CheckbackInfoDTO: Codable {
+    let checkbacked: Bool
+    let checkbackUser: String?
+    let checkbackAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case checkbacked
+        case checkbackUser = "checkback_user"
+        case checkbackAt = "checkback_at"
+    }
+}
+
+struct RectDTO: Codable {
+    let origin: PointDTO
+    let size: SizeDTO
+}
+
+struct PointDTO: Codable {
+    let x: CGFloat
+    let y: CGFloat
+}
+
+struct SizeDTO: Codable {
+    let x: CGFloat
+    let y: CGFloat
+}
+
+extension RectDTO {
+    var cgRect: CGRect {
+        CGRect(x: origin.x, y: origin.y, width: size.x, height: size.y)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Actions.swift
 ----------------------------------------
 import DrawingKit
 import SwiftUI
 import UIKit
+import Foundation
+import YamatoAppContracts
 
 extension OperationScreen {
 
-    func saveMergedToPhotos() {
+    // MARK: - Boot
+
+    /// 画面起動時の初期ロード
+    /// - entry を currentProject に設定
+    /// - entry画像をロック（selectedImageURL は固定）
+    /// - link projects / rects を最新化
+    @MainActor
+    func boot() async {
+        store.isBooting = true
+        defer { store.isBooting = false }
+
+        // entry を最初に開く
+        let entryID = payload.project.id
+        store.currentProjectID = entryID
+
+        // entry画像ロック（selectedImageURL）
+        do {
+            store.currentLoadedImage = try await store.model.lockedEntryImage()
+        } catch {
+            print("[ERROR] entry画像ダウンロード失敗: \(error)")
+            store.currentLoadedImage = .initial
+        }
+
+        // プロジェクト一覧＋rect統合を更新
+        await refreshProjectsIfNeeded()
+
+        // Rect反映（model -> store -> canvas）
+        store.overlayRects = store.model.allRects
+        syncOverlayRects()
+    }
+
+    /// scenePhase .active 復帰などで呼ぶ想定
+    /// - model.refresh で link projects と rects を更新
+    /// - store.overlayRects に反映して canvas の overlay を更新
+    @MainActor
+    func refreshProjectsIfNeeded() async {
+        let fallback = payload.project.id
+        let currentID = store.currentProjectID ?? fallback
+
+        await store.model.refresh(currentProjectID: currentID)
+
+        // ✅ Viewではなく Store に集約
+        store.overlayRects = store.model.allRects
+        syncOverlayRects()
+    }
+
+    // MARK: - Panel / Mode
+
+    /// 未確認部材パネルの表示切り替え
+    /// - OFFにしたら選択状態をクリア（誤選択防止）
+    /// - overlay の見た目も即時更新
+    func setUnconfirmedPartsVisible(_ visible: Bool) {
+        store.isUnconfirmedPartsVisible = visible
+        if !visible {
+            store.selectedRectIDs.removeAll()
+        }
+        syncOverlayRects()
+    }
+
+    /// モード切り替え時の「パネル強制クローズ」ルール
+    /// - 描画/通常/カメラなどモードが変わると、古いパネル状態が残ると事故るので閉じる
+    func closePanelsForModeSwitch(from old: InteractionMode, to new: InteractionMode) {
+        store.isUnconfirmedPartsVisible = false
+        store.isMemoVisible = false
+        store.isLinkProjectsVisible = false
+        store.isDrawingSettingsPanelVisible = false
+        store.presentedPanel = nil
+    }
+
+    // MARK: - Open Project
+
+    /// Rectタップ / リンクプロジェクト選択などでプロジェクトを開く
+    /// - currentProject を切り替え
+    /// - 必要ならそのRectへズーム要求を投げる（ZoomableDrawingRepresentable が処理）
+    func openProject(projectID: String, zoomRect: CanvasRect?) {
+        store.openProject(projectID: projectID, zoomRect: zoomRect)
+        
+        syncOverlayRects()
+    }
+
+    // MARK: - Export / Local persistence
+
+    /// iPhone フォトに「元画像 + お絵描き」をマージして保存
+    func saveMergedToPhotos(currentLoadedImage: LoadedImage) {
         guard let canvas else { return }
-        guard let base = UIImage(named: imageKey) else { return }
-        let merged = canvas.exportMergedImage(baseImage: base)
+        let merged = canvas.exportMergedImage(baseImage: currentLoadedImage.image)
         UIImageWriteToSavedPhotosAlbum(merged, nil, nil, nil)
     }
 
-    func saveDrawingLocal() {
+    /// ローカルに描画履歴を保存
+    func saveDrawingLocal(imageName: String, userName: String) {
         guard let canvas else { return }
         do {
             let data = try canvas.exportDrawingData()
             var pkg = DrawingPackage(
-                imageKey: imageKey,
-                drawingKey: drawingKey,
+                imageKey: imageName,
+                drawingKey: userName,
                 drawingData: data
             )
             pkg.updatedAt = Date()
             try DrawingLocalStore.shared.save(pkg)
-            print("✅ saved:", imageKey, drawingKey)
+            print("描画データ保存 成功:", imageName, userName)
         } catch {
-            print("❌ save failed:", error)
+            print("描画データ保存 失敗:", error)
         }
     }
 
-    func loadDrawingLocal() {
+    /// ローカルの描画履歴を読み出し
+    func loadDrawingLocal(imageName: String, userName: String) {
         guard let canvas else { return }
         do {
-            let pkg = try DrawingLocalStore.shared.load(imageKey: imageKey, drawingKey: drawingKey)
+            let pkg = try DrawingLocalStore.shared.load(imageKey: imageName, drawingKey: userName)
             try canvas.importDrawingData(pkg.drawingData)
-            print("✅ loaded:", imageKey, drawingKey)
+            print("描画データ読み込み 成功:", imageName, userName)
         } catch {
-            print("❌ load failed:", error)
+            print("描画データ読み込み 失敗:", error)
         }
 
         // overlay も反映
@@ -458,447 +2448,1033 @@ extension OperationScreen {
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+PhoneLayout.swift
+ZoomPanDrawingPlaygound/OperationScreen/IPhonePanels.swift
 ----------------------------------------
-import DrawingKit
 import SwiftUI
+import DrawingKit
+import UIKit
 
-extension OperationScreen {
+/// iPhone の `.sheet(item:)` で出す中身をまとめるView
+/// - OperationScreen の extension に散らばるのを避ける
+/// - store を起点に Binding を組み立てて、呼び出し側の引数を減らす
+struct IPhoneSheets: View {
 
-    @ViewBuilder
-    var phoneBottomBarLayer: some View {
-        safeAreaBottomBar
+    // MARK: - Inputs
+    let route: PanelRoute
+
+    @ObservedObject var store: OperationStore
+    @Binding var canvas: DrawingCanvasView?
+
+    /// 「写真へ保存」だけはキャンバス合成の都合で外から注入（ルールをここに持たせない）
+    let saveMergedToPhotos: (_ currentLoadedImage: LoadedImage) -> Void
+
+
+    // MARK: - Body
+    var body: some View {
+        content
     }
 
-    private var safeAreaBottomBar: some View {
-        VStack { Spacer() }
-            .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 12) {
-
-                    // ✅ モード切替（これが無いと描画できない）
-                    Button {
-                        interactionMode = .normal
-                    } label: {
-                        Label("通常", systemImage: "hand.draw")
-                    }
-                    .foregroundStyle(interactionMode == .normal ? .blue : .secondary)
-
-                    Button {
-                        interactionMode = .drawing
-                    } label: {
-                        Label("描画", systemImage: "pencil.tip")
-                    }
-                    .foregroundStyle(interactionMode == .drawing ? .blue : .secondary)
-
-                    Divider().frame(height: 18)
-
-                    Button {
-                        presentedPanel = .drawing
-                    } label: {
-                        Label("設定", systemImage: "slider.horizontal.3")
-                    }
-
-                    Button {
-                        presentedPanel = .rectList
-                    } label: {
-                        Label("一覧", systemImage: "square.stack")
-                    }
-
-                    Spacer()
-
-                    Button {
-                        saveMergedToPhotos()
-                    } label: {
-                        Label("保存", systemImage: "square.and.arrow.down")
-                    }
-                }
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial)
-            }
-    }
-
-    // ✅ iPhone sheet router
     @ViewBuilder
-    func phoneSheet(for route: PanelRoute) -> some View {
+    private var content: some View {
         switch route {
 
-        case .drawing:
-            DrawingModePanel(
-                drawMode: toolBinding,
-                stampKind: stampKindBinding,
-                color: activeColorBinding,
-                lineWidth: activeSizeBinding,
-                opacity: activeOpacityBinding,
-                eraserRadius: eraserRadiusBinding,
-                onUndo: { canvas?.undo() },
-                onRedo: { canvas?.redo() },
-                onSave: { saveMergedToPhotos() }
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .presentationDetents([.medium, .large])
-
-        case .rectList:
-            rectListPanelContent
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .presentationDetents([.medium, .large])
+        case .drawingTools:
+            VStack {
+                DrawingModePanel(
+                    drawMode: toolBinding,
+                    stampKind: stampKindBinding,
+                    color: activeColorBinding,
+                    lineWidth: activeSizeBinding,
+                    opacity: activeOpacityBinding,
+                    eraserRadius: eraserRadiusBinding,
+                    onUndo: { canvas?.undo() },
+                    onRedo: { canvas?.redo() },
+                    onSave: { saveMergedToPhotos(store.currentLoadedImage) }
+                )
+            }
+            .presentationDetents([.fraction(0.45)])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled)
 
         case .unconfirmedParts:
-            UnconfirmedPartsPanelView(
-                rects: overlayRects.filter { !$0.isHidden && !$0.isChecked },
-                selectedRectIDs: $selectedRectIDs,
-                onZoom: { rect in
-                    let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
-                    zoomRequest = .set(
-                        scale: max(viewportState.scale, 2.0),
-                        centerInImage: c
-                    )
-                },
-                onCameraCheckback: { selectedRects in
-                    print("camera checkback selected:", selectedRects.count)
-                }
-            )
-            .presentationDetents([.large])
-        }
-    }
-}
-
-
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen.swift
-----------------------------------------
-import DrawingKit
-import SwiftUI
-import UIKit
-
-struct OperationScreen: View {
-
-    @Environment(\.horizontalSizeClass) private var hSizeClass
-    var isPhoneLayout: Bool { hSizeClass == .compact }
-    
-    // 現在開いているプロジェクト（未確認部材一覧モードで有効）
-    @State var currentProjectID: String? = nil
-    //  プロジェクト切り替え時のズーム待機列
-    @State var pendingZoomRect: CanvasRect?
-
-    // iPhoneのsheet表示ルート
-    @State var presentedPanel: PanelRoute? = nil
-
-    // DrawingKit
-    @State var canvas: DrawingCanvasView?
-
-    // UIモード
-    @State var interactionMode: InteractionMode = .normal
-
-    // 描画設定
-    @State var drawingSettings = DrawingSettings()
-
-    // ZoomPan
-    @State var viewportState = ViewportState.initial
-    @State var zoomRequest: ZoomRequest = .none
-
-    // iPad: 描画パネル位置
-    @State var panelPos: CGPoint = .zero
-    @State var didInitPanelPos: Bool = false
-    let panelWidth: CGFloat = 260
-
-    // iPad: Rect一覧パネル位置
-    @State var rectListPanelPos: CGPoint = .zero
-    @State var didInitRectListPanelPos: Bool = false
-    let rectListPanelWidth: CGFloat = 320
-
-    // Rect一覧パネル表示トグル（iPad）
-    @State var isRectListVisible: Bool = false
-
-    // iPad: 選択パネル位置
-    @State var selectionPanelPos: CGPoint = .zero
-    @State var didInitSelectionPanelPos: Bool = false
-    let selectionPanelWidth: CGFloat = 320
-    
-    // 未確認部材一覧パネル（iPad）
-    @State var isUnconfirmedPartsVisible: Bool = false
-
-    @State var unconfirmedPartsPanelPos: CGPoint = .zero
-    @State var didInitUnconfirmedPartsPanelPos: Bool = false
-    let unconfirmedPartsPanelWidth: CGFloat = 320
-
-
-    // overlay rects
-    @State var overlayRects: [CanvasRect] = SampleData.overlayRects
-
-    // 選択
-    @State var selectedRectIDs: Set<UUID> = []
-
-    //  保存キー
-    //  Actionsで使用
-    @State var imageKey: String = "proj_a"
-    @State var drawingKey: String = "v1"
-
-    // Preset
-    @State var zoomPreset = ZoomPreset(centerX: 300, centerY: 300, scale: 2.0)
-    @State var rectPreset = RectPreset(centerX: 200, centerY: 200, width: 200, height: 140)
-
-    var body: some View {
-        ZStack (alignment: .top){
-            canvasLayer
-
-            // iPadだけ上部バー
-            if !isPhoneLayout {
-                OperationiPadTopBar(
-                            interactionMode: $interactionMode,
-                            isRectListVisible: $isRectListVisible,
-                            viewportScale: viewportState.scale,
-                            imageKey: $imageKey,
-                            drawingKey: $drawingKey,
-                            isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
-                            onResetZoom: { zoomRequest = .reset },
-                            onSaveLocal: { saveDrawingLocal() },
-                            onLoadLocal: { loadDrawingLocal() },
-                            onSavePhotos: { saveMergedToPhotos() }
-                            )
-            }
-
-            // iPad: floating
-            if !isPhoneLayout {
-                drawingPanelLayer
-                rectListPanelLayer
-                modePanelLayer
-                unconfirmedPartsPanelLayer
-            }
-
-            // iPhone: 固定バー + sheet
-            if isPhoneLayout {
-                IphoneRootLayout(
-                    canvasLayer: {canvasLayer},
-                    
-                    // iPhoneで未確認シートを常時出したいなら、ここは true 固定 or 状態で制御
-                    isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
-
-                    rectsForPanel: overlayRects.filter { !$0.isHidden && !$0.isChecked },
-                    selectedRectIDs: $selectedRectIDs,
-
-                    onOpenProject: { pid,rect in
-                        openProject(projectID: pid, zoomRect: rect)
+            VStack(spacing: 0) {
+                UnconfirmedPartsPanelView(
+                    rects: store.overlayRects.filter { !$0.isHidden && !$0.isChecked },
+                    selectedRectIDs: $store.selectedRectIDs,
+                    onZoom: { rect in
+                        let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
+                        store.zoomRequest = .set(
+                            scale: max(store.viewportState.scale, 2.0),
+                            centerInImage: c
+                        )
                     },
-
-                    // もしiPhoneの下バーも必要ならクロージャ/別Viewで渡す
-                    bottomBar: { phoneBottomBarLayer }
+                    onCameraCheckback: { _ in },
+                    onOpenProject: { pid, rect in
+                        store.openProject(projectID: pid, zoomRect: rect)
+                        store.presentedPanel = nil
+                    }
                 )
+                .padding(2)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(2)
             }
+            .presentationDetents([.fraction(0.35)])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled)
 
-            // iPhoneでも preset は sheet にしたいならここを差し替え可。
-            // ひとまず “いまのまま” 表示するなら iPhoneでも modePanelLayer を出してOK。
-            // ただし上部バーは出さないので、UI的には phoneSheet化の方が自然。
+        case .memo:
+            VStack {
+                MemoPanelView(
+                    text: $store.memoText,
+                    onSave: { store.presentedPanel = nil },
+                    onDiscard: {
+                        store.memoText = ""
+                        store.presentedPanel = nil
+                    }
+                )
+                .padding(2)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(2)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+
+        case .linkProjects:
+            VStack {
+                LinkProjectsPanelView(
+                    items: store.linkProjectItems,
+                    onTap: { item in
+                        store.openProject(projectID: item.id, zoomRect: nil)
+                        store.presentedPanel = nil
+                    }
+                )
+                .padding(6)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(6)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
-        .onChange(of: canvas) {
-            applyInteractionModeToCanvas()
-            syncCanvasToolState()
-            syncOverlayRects()
-        }
-        .onChange(of: interactionMode) {
-            applyInteractionModeToCanvas()
-            syncCanvasToolState()
-        }
-        .onChange(of: drawingSettings) {
-            syncCanvasToolState()
-        }
-        .onChange(of: overlayRects) {
-            syncOverlayRects()
-        }
-        .onChange(of: selectedRectIDs) {
-            syncOverlayRects()
-        }
-        .onChange(of: isUnconfirmedPartsVisible) {
-            if isUnconfirmedPartsVisible {
-                // 初回表示時：未確認Rectがあるなら、その先頭プロジェクトを開く
-                let unconfirmed = overlayRects.filter { !$0.isHidden && !$0.isChecked }
-                if currentProjectID == nil {
-                    currentProjectID = unconfirmed.first?.projectID
+    }
+}
+
+//  MARK: - DrawingSetting(お絵描き機能)のパラメータを単体で変更できるバインディングを作成する
+//  変更対象のDrawingSettingはStoreに入っている
+extension IPhoneSheets {
+    private var toolBinding: Binding<DrawMode> {
+        Binding(
+            get: { store.drawingSettings.tool },
+            set: { store.drawingSettings.tool = $0 }
+        )
+    }
+
+    private var stampKindBinding: Binding<StampKind> {
+        Binding(
+            get: { store.drawingSettings.stamp.kind },
+            set: { store.drawingSettings.stamp.kind = $0 }
+        )
+    }
+
+    private var activeColorBinding: Binding<Color> {
+        Binding(
+            get: {
+                switch store.drawingSettings.tool {
+                case .stamp: return store.drawingSettings.stamp.color
+                default:     return store.drawingSettings.pen.color
                 }
-            } else {
-                // モード外は overlay 無効（既存要件）
-                currentProjectID = nil
-                selectedRectIDs.removeAll() // 必要なら。残したいなら消してOK
+            },
+            set: { newValue in
+                switch store.drawingSettings.tool {
+                case .stamp: store.drawingSettings.stamp.color = newValue
+                default:     store.drawingSettings.pen.color = newValue
+                }
             }
-
-            syncOverlayRects()
-        }
-        .sheet(item: $presentedPanel) { route in
-//            phoneSheet(for: route)
-        }
+        )
     }
-    
-    func openProject(projectID: String,zoomRect: CanvasRect?) {
-        // 1) 現在プロジェクト切替
-        currentProjectID = projectID
 
-        // 2) 画像切替（例：projectID をそのままキーにする）
-        imageKey = projectID   // 例: "proj_a" / "proj_b" / "proj_c"
+    private var activeSizeBinding: Binding<CGFloat> {
+        Binding(
+            get: {
+                switch store.drawingSettings.tool {
+                case .stamp: return store.drawingSettings.stamp.size
+                default:     return store.drawingSettings.pen.width
+                }
+            },
+            set: { newValue in
+                switch store.drawingSettings.tool {
+                case .stamp: store.drawingSettings.stamp.size = newValue
+                default:     store.drawingSettings.pen.width = newValue
+                }
+            }
+        )
+    }
 
-        // 4) overlay 再描画
-        syncOverlayRects()
-        
-        guard let rect = zoomRect else { return }
+    private var activeOpacityBinding: Binding<CGFloat> {
+        Binding(
+            get: {
+                switch store.drawingSettings.tool {
+                case .stamp: return store.drawingSettings.stamp.opacity
+                default:     return store.drawingSettings.pen.opacity
+                }
+            },
+            set: { newValue in
+                switch store.drawingSettings.tool {
+                case .stamp: store.drawingSettings.stamp.opacity = newValue
+                default:     store.drawingSettings.pen.opacity = newValue
+                }
+            }
+        )
+    }
 
-        // 次の runloop で zoom を投げる（Canvas 再生成後）
-        DispatchQueue.main.async {
-            let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
-            zoomRequest = .set(
-                scale: max(viewportState.scale, 2.0),
-                centerInImage: c
-            )
-            pendingZoomRect = nil
-        }
+    private var eraserRadiusBinding: Binding<CGFloat> {
+        Binding(
+            get: { store.drawingSettings.eraser.radius },
+            set: { store.drawingSettings.eraser.radius = $0 }
+        )
     }
 }
 
-#Preview {
-    OperationScreen()
-}
 
-
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Canvas.swift
+ZoomPanDrawingPlaygound/OperationScreen/OperationScreen.swift
 ----------------------------------------
 import DrawingKit
 import SwiftUI
 import UIKit
+import YamatoAPIKit
+import YamatoAppContracts
 
+// MARK: - OperationScreen
+/// ✅ Viewは「レイアウト」と「Viewにしか置けない参照」だけを持つ
+///
+/// なぜViewに残す？
+/// - DrawingCanvasView の参照（UIKit bridge）は View のライフサイクルに密接でStoreに置きにくい
+/// - sheet / overlayの表示構造はSwiftUIの責務
+///
+/// それ以外（状態やルール）はStoreへ
+struct OperationScreen: View {
+    
+    // MARK: External
+    let services: YamatoServices
+    let payload: ProjectOpenPayload
+    let selectedImageURL: URL
+    
+    // MARK: Env
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Environment(\.scenePhase) private var scenePhase
+    private var isPhoneLayout: Bool { hSizeClass == .compact }
+    
+    // MARK: Store
+    @StateObject public var store: OperationStore
+    
+    // MARK: View-only references
+    /// UIKit bridge の参照：Viewからしか自然に管理しづらい
+    @State public var canvas: DrawingCanvasView? = nil
+    
+    /// 既存ロジックが参照してるので保持（ズーム対象を一時保持など）
+    @State private var pendingZoomRect: CanvasRect? = nil
+    
+    // MARK: Init
+    init(services: YamatoServices, payload: ProjectOpenPayload, selectedImageURL: URL) {
+        self.services = services
+        self.payload = payload
+        self.selectedImageURL = selectedImageURL
+        _store = StateObject(
+            wrappedValue: OperationStore(
+                services: services,
+                payload: payload,
+                selectedImageURL: selectedImageURL
+            )
+        )
+    }
+    
+    // MARK: Body
+    var body: some View {
+        ZStack {
+            content
+            
+            // StoreとModelの両方のローディングを1箇所で表示
+            if store.isBooting || store.model.isLoading {
+                loadingOverlay
+            }
+        }
+        //  iPhone用
+        .sheet(item: presentedPanelBinding) { route in
+            IPhoneSheets(
+                route: route,
+                store: store,
+                canvas: $canvas,
+                saveMergedToPhotos: { img in
+                    saveMergedToPhotos(currentLoadedImage: img)
+                }
+            )
+        }
+        .task {
+            await store.boot()
+            syncOverlayRects()       // 初期反映（既存関数に繋ぐ）
+        }
+        .onChangeCompat(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await store.refreshProjectsIfNeeded()
+                syncOverlayRects()
+            }
+        }
+        .onChangeCompat(of: store.overlayRects) { _, _ in
+            // rect元データが更新されたら表示用へ再合成して反映
+            syncOverlayRects()
+        }
+        .applyBindingsForOperation(
+            canvas: $canvas,
+            
+            // Storeの@PublishedをBindingにして既存バインド資産へ渡す
+            interactionMode: interactionModeBinding,
+            lastInteractionMode: lastInteractionModeBinding,
+            drawingSettings: drawingSettingsBinding,
+            overlayRects: overlayRectsBinding,
+            selectedRectIDs: selectedRectIDsBinding,
+            isUnconfirmedPartsVisible: isUnconfirmedPartsVisibleBinding,
+            presentedPanel: presentedPanelBinding,
+            
+            onCanvasChanged: {
+                // “キャンバスが作られた/差し替わった” タイミングはView側で反映するのが自然
+                applyInteractionModeToCanvas()
+                syncCanvasToolState()
+                syncOverlayRects()
+            },
+            onModeChanged: { old, new in
+                store.closePanelsForModeSwitch(from: old, to: new)
+                applyInteractionModeToCanvas()
+                syncCanvasToolState()
+            },
+            onOverlayChanged: {
+                syncOverlayRects()
+            },
+            onUnconfirmedChanged: { visible in
+                store.setUnconfirmedPartsVisible(visible)
+                syncOverlayRects()
+            },
+            onPresentedPanelChanged: { route in
+                store.setUnconfirmedPartsVisible(route == .unconfirmedParts)
+                syncOverlayRects()
+            },
+            onDrawingSettingChanged: {
+                syncCanvasToolState()
+                applyInteractionModeToCanvas() // ツール切替時にmodeも確実に更新
+            }
+        )
+    }
+}
+
+// MARK: - View composition
 extension OperationScreen {
     
-    var canvasLayer: some View {
-        ZoomableDrawingRepresentable(
-            image: UIImage(named: imageKey)!,
-            isDrawing: Binding(
-                get: { interactionMode == .drawing },
-                set: { interactionMode = $0 ? .drawing : .normal }
-            ),
-            canvasRef: $canvas,
-            viewportState: $viewportState,
-            zoomRequest: $zoomRequest,
-            onTapImagePoint: { p in
-                handleTapOnCanvas(at: p)
-            }
-        ).id(imageKey)
-    }
-    
-    func applyInteractionModeToCanvas() {
-        guard let canvas else { return }
-        switch interactionMode {
-        case .drawing:
-            canvas.mode = drawingSettings.tool
-        case .normal, .zoomPreset, .rectPreset:
-            canvas.mode = .none
-        }
-    }
-    
-    func syncCanvasToolState() {
-        guard let canvas else { return }
-        guard interactionMode == .drawing else { return }
-        
-        canvas.mode = drawingSettings.tool
-        
-        canvas.penStyle = PenStyle(
-            color: UIColor(drawingSettings.pen.color),
-            lineWidth: drawingSettings.pen.width,
-            opacity: drawingSettings.pen.opacity
-        )
-        
-        canvas.eraserRadius = drawingSettings.eraser.radius
-        
-        canvas.stampKind = drawingSettings.stamp.kind
-        canvas.stampStyle = StampStyle(
-            color: UIColor(drawingSettings.stamp.color),
-            size: drawingSettings.stamp.size,
-            opacity: drawingSettings.stamp.opacity
-        )
-    }
-    
-    func syncOverlayRects() {
-        guard let canvas else { return }
-
-        // 未確認部材一覧モード以外では overlay 自体を描かない（既存要件）
-        guard isUnconfirmedPartsVisible else {
-            canvas.setOverlayRects([])
-            return
-        }
-
-        // 未確認のRect（タップ対象にもする）
-        let unconfirmed = overlayRects.filter { !$0.isHidden && !$0.isChecked }
-
-        // 現在プロジェクト未設定なら、あるものから自動で開く
-        if currentProjectID == nil {
-            currentProjectID = unconfirmed.first?.projectID
-        }
-
-        guard let pid = currentProjectID else {
-            canvas.setOverlayRects([])
-            return
-        }
-
-        // 現在プロジェクトのRectだけ描画対象
-        let inCurrentProject = unconfirmed.filter { $0.projectID == pid }
-
-        // 選択状態は「見た目だけ強調」して描画（未選択も描く／選択だけ描く等はここで調整）
-        let rectsForCanvas: [CanvasRect] = inCurrentProject.map { r in
-            if selectedRectIDs.contains(r.id) {
-                var s = r.style
-                s.strokeWidth = max(s.strokeWidth, 5)
-                s.strokeColor = .systemBlue
-                return CanvasRect(
-                    id: r.id,
-                    externalID: r.externalID,
-                    name: r.name,
-                    projectID: r.projectID,
-                    projectName: r.projectName,
-                    isChecked: r.isChecked,
-                    isHidden: r.isHidden,
-                    rect: r.rect,
-                    style: s
-                )
+    private var content: some View {
+        ZStack(alignment: .top) {
+            canvasLayer
+            
+            if isPhoneLayout {
+                phoneOverlay
             } else {
-                return r
+                ipadOverlay
             }
         }
+    }
+    
+    private var phoneOverlay: some View {
+        VStack(spacing: 0) {
+            OperationPhoneTopBar(
+                interactionMode: interactionModeBinding,
+                viewportScale: store.viewportState.scale,
+                onBack: { /* dismiss */ },
+                onResetZoom: { store.zoomRequest = .reset },
+                onForceQuit: { /* your logic */ }
+            )
+            
+            Spacer()
+            
+            OperationPhoneBottomBar(
+                interactionMode: interactionModeBinding,
+                presentedPanel: presentedPanelBinding,
+                onUploadImage: { /* upload */ }
+            )
+            .padding(.init(top: 0, leading: 8, bottom: 16, trailing: 8))
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+    
+    private var ipadOverlay: some View {
+        Group {
+            topBarLayer
+            IPadPanels(
+                store: store,
+                canvas: $canvas,
+                openProject: openProject,
+                setUnconfirmedPartsVisible: setUnconfirmedPartsVisible,
+                saveMergedToPhotos: saveMergedToPhotos
+            )
+        }
+    }
+    
+    private var topBarLayer: some View {
+        let onBack: () -> Void = { /* dismiss */ }
+        let onResetZoom: () -> Void = { store.zoomRequest = .reset }
+        let onUploadImage: () -> Void = { /* upload */ }
+        
+        let onSaveLocal: () -> Void = {
+            saveDrawingLocal(imageName: store.currentLoadedImage.name, userName: payload.authSession.name)
+        }
+        let onLoadLocal: () -> Void = {
+            loadDrawingLocal(imageName: store.currentLoadedImage.name, userName: payload.authSession.name)
+        }
+        
+        return OperationiPadTopBar(
+            interactionMode: interactionModeBinding,
+            viewportScale: store.viewportState.scale,
+            isUnconfirmedPartsVisible: isUnconfirmedPartsVisibleBinding,
+            isMemoVisible: isMemoVisibleBinding,
+            isLinkProjectsVisible: isLinkProjectsVisibleBinding,
+            isDrawingSettingsPanelVisible: isDrawingSettingsPanelVisibleBinding,
+            onBack: onBack,
+            onResetZoom: onResetZoom,
+            onUploadImage: onUploadImage,
+            onSaveLocal: onSaveLocal,
+            onLoadLocal: onLoadLocal,
+            onSavePhotos: { }
+        )
+        .padding()
+    }
+    
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.18).ignoresSafeArea()
+            ProgressView("読み込み中…")
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+}
 
-        canvas.setOverlayRects(rectsForCanvas)
+// MARK: - Bindings (ObservableObject -> Binding)
+extension OperationScreen {
+    
+    /// SwiftUIの `ObservableObject` は `@Published` を `$store.xxx` で直接渡せないため
+    /// ここで “既存のBinding依存コード” に繋ぐためのBindingを用意する
+    
+    private var presentedPanelBinding: Binding<PanelRoute?> {
+        Binding(get: { store.presentedPanel }, set: { store.presentedPanel = $0 })
+    }
+    
+    private var interactionModeBinding: Binding<InteractionMode> {
+        Binding(get: { store.interactionMode }, set: { store.interactionMode = $0 })
+    }
+    
+    private var lastInteractionModeBinding: Binding<InteractionMode> {
+        Binding(get: { store.lastInteractionMode }, set: { store.lastInteractionMode = $0 })
+    }
+    
+    private var drawingSettingsBinding: Binding<DrawingSettings> {
+        Binding(get: { store.drawingSettings }, set: { store.drawingSettings = $0 })
+    }
+    
+    private var overlayRectsBinding: Binding<[CanvasRect]> {
+        Binding(get: { store.overlayRects }, set: { store.overlayRects = $0 })
+    }
+    
+    private var selectedRectIDsBinding: Binding<Set<UUID>> {
+        Binding(get: { store.selectedRectIDs }, set: { store.selectedRectIDs = $0 })
+    }
+    
+    private var isUnconfirmedPartsVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isUnconfirmedPartsVisible }, set: { store.isUnconfirmedPartsVisible = $0 })
+    }
+    
+    private var isMemoVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isMemoVisible }, set: { store.isMemoVisible = $0 })
+    }
+    
+    private var isLinkProjectsVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isLinkProjectsVisible }, set: { store.isLinkProjectsVisible = $0 })
+    }
+    
+    private var isDrawingSettingsPanelVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isDrawingSettingsPanelVisible }, set: { store.isDrawingSettingsPanelVisible = $0 })
+    }
+}
+
+// MARK: - Overlay sync (View -> Canvas)
+extension OperationScreen {
+    
+    /// Canvasへ渡す “表示用rect” をStoreのルールで作って反映する
+    ///
+    /// なぜView？
+    /// - `canvas?.setOverlayRects(...)` はUIKit参照を触るのでView側が責務を持つ
+    public func syncOverlayRects() {
+        let display = store.makeDisplayOverlayRects()
+        canvas?.setOverlayRects(display)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/OperationStore.swift
+----------------------------------------
+import SwiftUI
+import DrawingKit
+import YamatoAPIKit
+import YamatoAppContracts
+import UIKit
+import Combine
+
+/// Operation画面全体の状態を保持し、状態遷移ルールを持つ（＝Store）
+///
+/// なぜ ViewModel ではなく Store？
+/// - OperationScreen は「複数パネル」「描画キャンバス」「選択状態」「ズーム状態」など
+///   1画面の中に複数View相当の状態を同時に扱う
+/// - “単一ViewのためのViewModel” より “画面全体の状態ストア” の方が責務が明確
+///
+/// 役割：
+/// - UI状態（モード / 選択 / パネル / ズーム）を @Published で保持
+/// - Model（データ層）を呼び、結果をUI表示用に整形して反映
+/// - 「表示用Overlay（青=チェック済み + 未確認=現在プロジェクトのみ）」の合成を提供
+///
+/// 置かないもの：
+/// - URLSession等の通信実装（それはModel）
+/// - SwiftUIのレイアウト（それはView）
+@MainActor
+final class OperationStore: ObservableObject {
+
+    // MARK: - External / fixed
+
+    let services: YamatoServices
+    let payload: ProjectOpenPayload
+    let selectedImageURL: URL
+
+    /// データ層（取得・統合・キャッシュ）
+    let model: OperationScreenModel
+
+    // MARK: - Published (Viewが直接監視する状態)
+
+    // 現在表示対象のプロジェクト（未確認パネルで切替される）
+    @Published var currentProjectID: String? = nil
+
+    // モードと描画設定（UI操作で切り替わる）
+    @Published var interactionMode: InteractionMode = .normal
+    @Published var drawingSettings: DrawingSettings = .init()
+
+    // entry画像（画面中固定）
+    @Published var currentLoadedImage: LoadedImage = .initial
+
+    // ズームパン（キャンバス層が参照）
+    @Published var viewportState: ViewportState = .initial
+    @Published var zoomRequest: ZoomRequest = .none
+
+    // Overlayの“元データ”（全プロジェクト分）
+    @Published var overlayRects: [CanvasRect] = []
+
+    // 未確認パネルでの選択状態（Rectを選択/解除）
+    @Published public var selectedRectIDs: Set<UUID> = []
+
+    // Panels (shared)
+    @Published var presentedPanel: PanelRoute? = nil
+
+    @Published var isMemoVisible: Bool = false
+    @Published var isLinkProjectsVisible: Bool = false
+    @Published var isDrawingSettingsPanelVisible: Bool = true
+    @Published var isUnconfirmedPartsVisible: Bool = false
+
+    @Published var memoText: String = ""
+
+    // iPad floating positions（“UIの配置”だが、複数ビュー跨ぎで共有するため Store 管理）
+    @Published var panelPos: CGPoint = CGPoint(x: 9999, y: 9999)
+    @Published var didInitPanelPos: Bool = false
+
+    @Published var unconfirmedPartsPanelPos: CGPoint = CGPoint(x: 9999, y: 9999)
+    @Published var didInitUnconfirmedPartsPanelPos: Bool = false
+
+    @Published var memoPanelPos: CGPoint = CGPoint(x: 9999, y: 9999)
+    @Published var didInitMemoPanelPos: Bool = false
+
+    @Published var linkProjectsPos: CGPoint = CGPoint(x: 9999, y: 9999)
+    @Published var didInitLinkProjectsPanelPos: Bool = false
+
+    // Loading（画面起動シーケンス）
+    @Published var isBooting: Bool = false
+
+    // iOS16 old/new workaround（以前ViewにあったものをStoreへ移す）
+    @Published var lastInteractionMode: InteractionMode = .normal
+
+    // MARK: - Init
+
+    init(
+        services: YamatoServices,
+        payload: ProjectOpenPayload,
+        selectedImageURL: URL
+    ) {
+        self.services = services
+        self.payload = payload
+        self.selectedImageURL = selectedImageURL
+        self.model = OperationScreenModel(
+            services: services,
+            entryProjectID: payload.project.id,
+            selectedImageURL: selectedImageURL
+        )
     }
 
-    /// ✅ 画像座標でヒットテスト → 選択トグル
-    /// - 非表示(isHidden)はヒット対象から除外（タップ無効化）
-    /// - チェック済み(isChecked)もヒット対象から除外（仕様：一覧にも出すがタップ対象外）
+    // MARK: - Boot / Refresh
+
+    /// 画面初回表示時に1回呼ぶ想定
+    ///
+    /// なぜStoreがやる？
+    /// - “起動時に何をどの順で揃えるか” はUIの流れ（画面の状態遷移）なのでStore
+    func boot() async {
+        isBooting = true
+        defer { isBooting = false }
+
+        // 1) entry を最初に開く（起動直後の表示先）
+        let entryID = payload.project.id
+        currentProjectID = entryID
+
+        // 2) entry画像ロック（画面中固定）
+        do {
+            currentLoadedImage = try await model.lockedEntryImage()
+        } catch {
+            // ここはUIを壊さず初期状態に落とす
+            print("[ERROR] entry画像ダウンロード失敗:", error)
+            currentLoadedImage = .initial
+        }
+
+        // 3) リンクプロジェクト一覧＋rect統合を更新
+        await refreshProjectsIfNeeded()
+
+        // 4) 全rectを“元データ”として保持
+        overlayRects = model.allRects
+    }
+
+    /// 画面復帰やプロジェクト切替のタイミングで呼ぶ
+    func refreshProjectsIfNeeded() async {
+        let fallback = payload.project.id
+        let currentID = currentProjectID ?? fallback
+
+        await model.refresh(currentProjectID: currentID)
+
+        // Modelが「全件統合」を作る → Storeは「UI用元データ」として受け取る
+        overlayRects = model.allRects
+    }
+
+    // MARK: - Panel / Mode
+
+    /// 未確認パネル表示切替
+    /// - 非表示にする時は選択状態もクリア（UI整合性）
+    func setUnconfirmedPartsVisible(_ visible: Bool) {
+        isUnconfirmedPartsVisible = visible
+        if !visible { selectedRectIDs.removeAll() }
+    }
+
+    /// モード切替時のパネル制御（状態遷移ルール）
+    func closePanelsForModeSwitch(from old: InteractionMode, to new: InteractionMode) {
+        // “モードが変わったら一旦パネルを閉じる” というUIルールを一箇所に集約
+        isUnconfirmedPartsVisible = false
+        isMemoVisible = false
+        isLinkProjectsVisible = false
+        isDrawingSettingsPanelVisible = false
+        presentedPanel = nil
+    }
+
+    // MARK: - Project open (from panels / tap)
+
+    /// パネルからプロジェクトを開く（必要ならズームも同時に行う）
+    @MainActor
+    func openProject(projectID: String, zoomRect: CanvasRect?) {
+        currentProjectID = projectID
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            // entry はユーザー選択画像（固定）
+            if projectID == payload.project.id {
+                self.currentLoadedImage = (try? await self.model.lockedEntryImage()) ?? .initial
+            } else {
+                // それ以外は「サムネ」
+                if let vm = self.model.projects.first(where: { $0.id == projectID }) {
+                    if let thumb = vm.loadedThumb {
+                        self.currentLoadedImage = thumb
+                    } else if let url = vm.thumbnailURL {
+                        // 万一まだ落ちてなければここで落とす（保険）
+                        self.currentLoadedImage = (try? await LoadedImage(url: url)) ?? .initial
+                    } else {
+                        self.currentLoadedImage = .initial
+                    }
+                }
+            }
+
+            // ズームして表示する場合
+            if let rect = zoomRect {
+                let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
+                self.zoomRequest = .set(scale: max(self.viewportState.scale, 2.0), centerInImage: c)
+            }
+        }
+    }
+
+    // MARK: - Canvas tap logic (選択トグル)
+
+    /// キャンバスをタップしたときの選択ルール
+    ///
+    /// なぜStore？
+    /// - タップ→選択トグルは「状態遷移ルール」なのでStoreが持つ
     func handleTapOnCanvas(at imagePoint: CGPoint) {
-        // 未確認部材一覧モード以外は、Rectタップ無効（既存要件）
         guard isUnconfirmedPartsVisible else { return }
 
-        // タップ対象：未確認（非表示/確認済みは除外）
-        let tappable = overlayRects.filter { !$0.isHidden && !$0.isChecked }
+        // ✅ 表示用rectから「タップ対象」を作る（= 表示と判定を一致させる）
+        let tappable = makeDisplayOverlayRects()
+            .filter { !$0.isHidden && !$0.isChecked }   // 未確認だけタップ可能
 
         guard let hit = tappable.reversed().first(where: { $0.rect.contains(imagePoint) }) else {
             return
         }
 
-        // 別プロジェクトのRectをタップしたら「そのプロジェクトを開く」
-        if currentProjectID != hit.projectID {
-            currentProjectID = hit.projectID
-            print(currentProjectID)
-        }
+        // ✅ ここはもう “別プロジェクトがヒットする” こと自体が起きない
+        // （makeDisplayOverlayRects が currentProject 分だけ返すから）
 
-        // 選択トグル
         if selectedRectIDs.contains(hit.id) {
             selectedRectIDs.remove(hit.id)
         } else {
             selectedRectIDs.insert(hit.id)
         }
+    }
 
-        // 見た目更新
-        syncOverlayRects()
+    // MARK: - Overlay composition (canvasへ渡す用)
+
+    /// canvas.setOverlayRects に渡す “表示用Rect” を作る
+    ///
+    /// 表示ルール：
+    /// 1) チェック済みは常時表示（青）
+    /// 2) 未確認部材一覧ONの時だけ、未チェックを表示
+    ///    - ただし “現在選択中プロジェクト分だけ” 表示（見た目が散らからないため）
+    func makeDisplayOverlayRects() -> [CanvasRect] {
+
+        // 1) チェック済み：常時青
+        let checkedAll: [CanvasRect] = overlayRects
+            .filter { !$0.isHidden && $0.isChecked }
+            .map { r in
+                var s = r.style
+                s.strokeColor = .systemBlue
+                s.strokeWidth = max(s.strokeWidth, 2)
+                s.fill = .none
+                return r.with(style: s)
+            }
+
+        // 2) 未確認：一覧ONの時だけ、現在プロジェクト分のみ（黄色系）
+        let unconfirmedInCurrentProject: [CanvasRect]
+        if isUnconfirmedPartsVisible {
+            let unconfirmed = overlayRects.filter { !$0.isHidden && !$0.isChecked }
+
+            if currentProjectID == nil {
+                currentProjectID = unconfirmed.first?.projectID ?? checkedAll.first?.projectID
+            }
+
+            if let pid = currentProjectID {
+                unconfirmedInCurrentProject = unconfirmed.filter { $0.projectID == pid }
+            } else {
+                unconfirmedInCurrentProject = []
+            }
+        } else {
+            unconfirmedInCurrentProject = []
+        }
+
+        // 3) 選択中の強調（最優先で上書き）
+        func applySelectedStyle(_ rects: [CanvasRect]) -> [CanvasRect] {
+            rects.map { r in
+                guard selectedRectIDs.contains(r.id) else { return r }
+                var s = r.style
+                s.strokeColor = .systemGreen      // ← 好きな色に
+                s.strokeWidth = max(s.strokeWidth, 4)
+                s.fill = .solid(UIColor.systemGreen.withAlphaComponent(0.18)) // お好みで
+                return r.with(style: s)
+            }
+        }
+
+        return applySelectedStyle(checkedAll) + applySelectedStyle(unconfirmedInCurrentProject)
+    }
+}
+
+// MARK: - Small helper
+private extension CanvasRect {
+    func with(style: CanvasRectStyle) -> CanvasRect {
+        CanvasRect(
+            id: id,
+            externalID: externalID,
+            name: name,
+            projectID: projectID,
+            projectName: projectName,
+            isChecked: isChecked,
+            isHidden: isHidden,
+            rect: rect,
+            style: style
+        )
+    }
+}
+
+//  MARK: - LinkProject用ヘルパー
+extension OperationStore{
+    /// LinkProjectsPanelView に渡す表示用アイテム
+    var linkProjectItems: [LinkProjectItem] {
+        model.projects.map { p in
+            LinkProjectItem(id: p.id, name: p.name)
+        }
     }
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Types.swift
+ZoomPanDrawingPlaygound/OperationScreen/DrawingLocalStore.swift
+----------------------------------------
+import Foundation
+
+/// DrawingPackage をローカル(JSON)に保存・読み込みする責務を持つクラス
+/// imageKey ごとにディレクトリを切り、その中に drawingKey.json を保存する
+final class DrawingLocalStore {
+
+    /// ストア操作時のエラー定義
+    enum StoreError: Error {
+        case invalidKey   // 空文字や不正なキー
+        case notFound     // ファイルが存在しない
+    }
+
+    /// シングルトン（アプリ内で1つだけ使う想定）
+    static let shared = DrawingLocalStore()
+    private init() {}
+
+    // MARK: - Paths
+
+    /// Application Support/DrawingData を返す
+    /// なければディレクトリを作成する
+    private func baseDir() throws -> URL {
+        let fm = FileManager.default
+
+        // Application Support ディレクトリを取得（なければ作る）
+        let dir = try fm.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+
+        // Drawing データ専用のベースディレクトリ
+        let base = dir.appendingPathComponent("DrawingData", isDirectory: true)
+
+        // 中間ディレクトリ含めて作成（すでにあってもOK）
+        try fm.createDirectory(at: base, withIntermediateDirectories: true, attributes: nil)
+
+        // iCloud バックアップ対象外に設定（キャッシュ的用途想定）
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutableBase = base
+        try? mutableBase.setResourceValues(values)
+
+        return base
+    }
+
+    /// ファイル名として安全な文字列に変換する
+    /// - 空文字は禁止
+    /// - 英数 + -_. 以外は "_" に置換
+    private func sanitize(_ key: String) throws -> String {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw StoreError.invalidKey }
+
+        // 許可する文字セット
+        let allowed = CharacterSet.alphanumerics.union(
+            CharacterSet(charactersIn: "-_.")
+        )
+
+        // 許可されていない文字は "_" に変換
+        let mapped = trimmed.unicodeScalars.map { scalar -> Character in
+            allowed.contains(scalar) ? Character(scalar) : "_"
+        }
+
+        // "__" が連続しないように整理
+        var s = String(mapped)
+        while s.contains("__") {
+            s = s.replacingOccurrences(of: "__", with: "_")
+        }
+
+        // 先頭・末尾の "_" を除去（見た目安定用）
+        s = s.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+
+        guard !s.isEmpty else { throw StoreError.invalidKey }
+        return s
+    }
+
+    /// imageKey / drawingKey から保存先ファイルURLを生成する
+    ///
+    /// DrawingData/
+    ///   └ imageKey/
+    ///       └ drawingKey.json
+    private func fileURL(imageKey: String, drawingKey: String) throws -> URL {
+        let base = try baseDir()
+
+        let img = try sanitize(imageKey)
+        let draw = try sanitize(drawingKey)
+
+        // imageKey ごとのディレクトリ
+        let imgDir = base.appendingPathComponent(img, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: imgDir,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        return imgDir.appendingPathComponent("\(draw).json")
+    }
+
+    // MARK: - Public API
+
+    /// DrawingPackage を JSON として保存する
+    func save(_ package: DrawingPackage) throws {
+        let url = try fileURL(
+            imageKey: package.imageKey,
+            drawingKey: package.drawingKey
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        let data = try encoder.encode(package)
+
+        // atomic: 書き込み途中で落ちても壊れない
+        try data.write(to: url, options: [.atomic])
+    }
+
+    /// 指定した imageKey / drawingKey の DrawingPackage を読み込む
+    func load(imageKey: String, drawingKey: String) throws -> DrawingPackage {
+        let url = try fileURL(imageKey: imageKey, drawingKey: drawingKey)
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw StoreError.notFound
+        }
+
+        let data = try Data(contentsOf: url)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        return try decoder.decode(DrawingPackage.self, from: data)
+    }
+
+    /// 指定 imageKey 配下に存在する drawingKey 一覧を返す
+    func listDrawingKeys(imageKey: String) throws -> [String] {
+        let base = try baseDir()
+        let img = try sanitize(imageKey)
+        let dir = base.appendingPathComponent(img, isDirectory: true)
+
+        // ディレクトリがなければ空配列
+        guard FileManager.default.fileExists(atPath: dir.path) else {
+            return []
+        }
+
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+
+        return urls
+            .filter { $0.pathExtension.lowercased() == "json" }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted()
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Canvas.swift
+----------------------------------------
+import DrawingKit
+import SwiftUI
+import UIKit
+
+extension OperationScreen {
+
+    // MARK: - Canvas Layer
+
+    /// 描画/ズーム/タップを受けるキャンバス層
+    ///
+    /// なぜView側？
+    /// - ZoomableDrawingRepresentable は UIKit ブリッジ（canvasRef）を扱う
+    /// - canvasRef は View のライフサイクルで保持するのが自然（Storeに置くと参照管理が難しい）
+    var canvasLayer: some View {
+        ZoomableDrawingRepresentable(
+            image: store.currentLoadedImage.image,
+            isDrawing: Binding(
+                get: { store.interactionMode == .drawing },
+                set: { store.interactionMode = $0 ? .drawing : .normal }
+            ),
+            canvasRef: $canvas,
+            viewportState: Binding(
+                get: { store.viewportState },
+                set: { store.viewportState = $0 }
+            ),
+            zoomRequest: Binding(
+                get: { store.zoomRequest },
+                set: { store.zoomRequest = $0 }
+            ),
+            onTapImagePoint: { p in
+                // ✅ タップ→状態遷移ルールは Store に集約（Viewは「通知」だけ）
+                store.handleTapOnCanvas(at: p)
+                // ✅ 見た目更新（canvas参照を触るのはViewの責務）
+                syncOverlayRects()
+            }
+        )
+        // ✅ 画像が切り替わったらRepresentableを作り直してズレを防ぐ
+        .id(store.currentLoadedImage.name)
+    }
+
+    // MARK: - Canvas tool sync
+
+    /// UIモード（normal/drawing/camera）を canvas に反映
+    ///
+    /// なぜView側？
+    /// - canvas は UIKit参照でViewが保持しているため、操作もView側で行う
+    func applyInteractionModeToCanvas() {
+        guard let canvas else { return }
+
+        switch store.interactionMode {
+        case .drawing:
+            canvas.mode = store.drawingSettings.tool
+        case .normal, .camera:
+            canvas.mode = .none
+        }
+    }
+
+    /// 描画設定（ペン/消しゴム/スタンプ）を canvas に反映
+    ///
+    /// これもView側でOK：理由は applyInteractionModeToCanvas と同じ
+    func syncCanvasToolState() {
+        guard let canvas else { return }
+        guard store.interactionMode == .drawing else { return }
+
+        let settings = store.drawingSettings
+
+        canvas.mode = settings.tool
+
+        canvas.penStyle = PenStyle(
+            color: UIColor(settings.pen.color),
+            lineWidth: settings.pen.width,
+            opacity: settings.pen.opacity
+        )
+
+        canvas.eraserRadius = settings.eraser.radius
+
+        canvas.stampKind = settings.stamp.kind
+        canvas.stampStyle = StampStyle(
+            color: UIColor(settings.stamp.color),
+            size: settings.stamp.size,
+            opacity: settings.stamp.opacity
+        )
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Types.swift
 ----------------------------------------
 import DrawingKit
 import SwiftUI
@@ -908,15 +3484,15 @@ import UIKit
 enum InteractionMode: Equatable {
     case normal
     case drawing
-    case zoomPreset
-    case rectPreset
+    case camera
 }
 
 // iPhone sheet route
 enum PanelRoute: String, Identifiable {
-    case drawing
-    case rectList
-    case unconfirmedParts //    未選択部材一覧パネル
+    case drawingTools
+    case unconfirmedParts
+    case memo
+    case linkProjects
 
     var id: String { rawValue }
 }
@@ -935,6 +3511,16 @@ struct RectPreset: Equatable {
 }
 
 enum SampleData {
+    
+    static let linkProjects: [LinkProjectItem] = {
+        // プロジェクト定義
+        let projects: [LinkProjectItem] = [
+            LinkProjectItem(id:"proj_a", name:"プロジェクトA"),
+            LinkProjectItem(id:"proj_b", name:"プロジェクトB"),
+            LinkProjectItem(id:"proj_c", name:"プロジェクトC"),
+        ]
+        return projects
+    }()
 
     static let overlayRects: [CanvasRect] = {
         var rects: [CanvasRect] = []
@@ -997,83 +3583,1228 @@ enum SampleData {
 }
 
 
-./ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Bindings.swift
+ZoomPanDrawingPlaygound/OperationScreen/PipeListMapper.swift
+----------------------------------------
+import DrawingKit
+import UIKit
+
+//  PipeListDTO -> CanvasRect
+enum PipeListMapper {
+    static func toCanvasRects(
+        _ items: [PipeItemDTO],
+        projectID: String,
+        projectName: String
+    ) -> [CanvasRect] {
+        items.map { item in
+            let checked = item.checkbackInfo.checkbacked
+
+            // checkedなら薄く/触れない仕様にするなら isChecked=true
+            // ※あなたの既存ロジック：isCheckedは「確認済みで一覧から除外」じゃなく
+            // 「未確認一覧のフィルタで除外」になってるので、ここは仕様次第
+            let isChecked = checked
+
+            let style = CanvasRectStyle(
+                strokeColor: checked ? .systemGray : .systemYellow,
+                strokeWidth: checked ? 2 : 2,
+                fill: checked
+                    ? .none
+                    : .solid(UIColor.systemYellow.withAlphaComponent(0.12))
+            )
+
+            return CanvasRect(
+                id: StableUUID.make(item.pipeCheckID),
+                externalID: item.pipeCheckID,
+                name: item.pipeName,
+                projectID: projectID,
+                projectName: projectName,
+                isChecked: isChecked,
+                isHidden: false,
+                rect: item.imageRect.cgRect,
+                style: style
+            )
+        }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/ZoomableDrawingRepresentable.swift
+----------------------------------------
+import DrawingKit
+import SwiftUI
+import UIKit
+
+struct ZoomableDrawingRepresentable: UIViewRepresentable {
+    let image: UIImage
+
+    @Binding var isDrawing: Bool
+    @Binding var canvasRef: DrawingCanvasView?
+
+    @Binding var viewportState: ViewportState
+    @Binding var zoomRequest: ZoomRequest
+
+    /// 画像座標でタップを通知
+    var onTapImagePoint: ((CGPoint) -> Void)?
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var lastIsDrawing: Bool?
+        var onTapImagePoint: ((CGPoint) -> Void)?
+        weak var zoom: ZoomPanUIView?
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
+
+        @objc func handleTap(_ g: UITapGestureRecognizer) {
+            guard g.state == .ended else { return }
+            guard let zoom else { return }
+            let pView = g.location(in: zoom)
+            let pImage = zoom.viewPointToImagePoint(pView)!
+            onTapImagePoint?(pImage)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        let c = Coordinator()
+        c.onTapImagePoint = onTapImagePoint
+        return c
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+
+        // --- Zoom (下) ---
+        let zoom = ZoomPanUIView()
+        zoom.setImage(image)
+
+        // --- Canvas (上) ---
+        let canvas = DrawingCanvasView()
+        canvas.backgroundColor = .clear
+
+        // Viewport 変化通知（高頻度）
+        zoom.onViewportChanged = { [weak canvas] state in
+            canvas?.viewToCanvasScale = state.scale
+            canvas?.refreshForViewportChange()
+            DispatchQueue.main.async { self.viewportState = state }
+        }
+
+        // 座標変換（ズーム追従の核）
+        canvas.viewPointToCanvasPoint = { [weak zoom] pView in
+            zoom?.viewPointToImagePoint(pView)
+        }
+        canvas.canvasPointToViewPoint = { [weak zoom] pImage in
+            zoom?.imagePointToViewPoint(pImage)
+        }
+
+        // 2本指ジェスチャを Zoom に委譲
+        canvas.onTwoFingerPan = { [weak zoom] g in zoom?.handleExternalPan(g) }
+        canvas.onPinch = { [weak zoom] g in zoom?.handleExternalPinch(g) }
+
+        canvas.viewLengthToCanvasLength = { [weak zoom] viewLen in
+            zoom?.viewLengthToImageLength(viewLen) ?? viewLen
+        }
+        canvas.canvasLengthToViewLength = { [weak zoom] imageLen in
+            zoom?.imageLengthToViewLength(imageLen) ?? imageLen
+        }
+
+        // レイアウト
+        zoom.frame = container.bounds
+        zoom.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        canvas.frame = container.bounds
+        canvas.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        container.addSubview(zoom)
+        container.addSubview(canvas)
+
+        DispatchQueue.main.async { self.canvasRef = canvas }
+
+        // ★タップジェスチャ（zoomに付ける）
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        tap.cancelsTouchesInView = false
+        tap.delegate = context.coordinator
+        zoom.addGestureRecognizer(tap)
+
+        context.coordinator.zoom = zoom
+
+        // 初期状態
+        applyMode(isDrawing: isDrawing, zoom: zoom, canvas: canvas)
+
+        return container
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        guard
+            let zoom = uiView.subviews.compactMap({ $0 as? ZoomPanUIView }).first,
+            let canvas = uiView.subviews.compactMap({ $0 as? DrawingCanvasView }).first
+        else { return }
+
+        context.coordinator.onTapImagePoint = onTapImagePoint
+        context.coordinator.zoom = zoom
+
+        if context.coordinator.lastIsDrawing != isDrawing {
+            context.coordinator.lastIsDrawing = isDrawing
+
+            zoom.cancelAllGestures()
+            canvas.cancelAllGestures()
+
+            applyMode(isDrawing: isDrawing, zoom: zoom, canvas: canvas)
+
+            DispatchQueue.main.async {
+                zoom.cancelAllGestures()
+                canvas.cancelAllGestures()
+                applyMode(isDrawing: isDrawing, zoom: zoom, canvas: canvas)
+            }
+        }
+
+        switch zoomRequest {
+        case .none:
+            break
+        case .reset:
+            zoom.resetViewport()
+            DispatchQueue.main.async { zoomRequest = .none }
+        case .set(let s, let c):
+            zoom.setViewport(scale: s, centerInImage: c)
+            DispatchQueue.main.async { zoomRequest = .none }
+        }
+    }
+
+    private func applyMode(isDrawing: Bool, zoom: ZoomPanUIView, canvas: DrawingCanvasView) {
+        if isDrawing {
+            canvas.isUserInteractionEnabled = true
+            zoom.setOwnGesturesEnabled(false)
+        } else {
+            canvas.isUserInteractionEnabled = false
+            zoom.setOwnGesturesEnabled(true)
+        }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/Helpers/OnChangeCompat.swift
+----------------------------------------
+import SwiftUI
+
+private struct OnChangeCompatModifier<Value: Equatable>: ViewModifier {
+    let value: Value
+    let initial: Bool
+    let action: (Value, Value) -> Void
+
+    @State private var oldValue: Value
+    @State private var didFireInitial = false
+
+    init(value: Value, initial: Bool, action: @escaping (Value, Value) -> Void) {
+        self.value = value
+        self.initial = initial
+        self.action = action
+        _oldValue = State(initialValue: value)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                guard initial, !didFireInitial else { return }
+                didFireInitial = true
+                action(oldValue, value)
+            }
+            .modifier(_OnChangeImpl(value: value) { newValue in
+                let prev = oldValue
+                oldValue = newValue
+                action(prev, newValue)
+            })
+    }
+
+    /// iOS17 では新API、iOS16 では旧APIを使う内部実装
+    private struct _OnChangeImpl: ViewModifier {
+        let value: Value
+        let action: (Value) -> Void
+
+        func body(content: Content) -> some View {
+            if #available(iOS 17.0, *) {
+                content.onChange(of: value) { _, new in
+                    action(new)
+                }
+            } else {
+                content.onChange(of: value) { new in
+                    action(new)
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    /// iOS16/17 両対応：old/new が取れる onChange
+    func onChangeCompat<Value: Equatable>(
+        of value: Value,
+        initial: Bool = false,
+        _ action: @escaping (_ old: Value, _ new: Value) -> Void
+    ) -> some View {
+        modifier(OnChangeCompatModifier(value: value, initial: initial, action: action))
+    }
+}
+
+
+ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Bindings.swift
 ----------------------------------------
 import DrawingKit
 import SwiftUI
 
-extension OperationScreen {
+// MARK: - Common binding applicator (そのまま使ってOK)
+extension View {
+    // iOS16 では old/new が取れないので lastInteractionMode を外から渡す
+    func applyBindingsForOperation(
+        canvas: Binding<DrawingCanvasView?>,
+        interactionMode: Binding<InteractionMode>,
+        lastInteractionMode: Binding<InteractionMode>,
+        drawingSettings: Binding<DrawingSettings>,
+        overlayRects: Binding<[CanvasRect]>,
+        selectedRectIDs: Binding<Set<UUID>>,
+        isUnconfirmedPartsVisible: Binding<Bool>,
+        presentedPanel: Binding<PanelRoute?>,
+        onCanvasChanged: @escaping () -> Void,
+        onModeChanged: @escaping (_ old: InteractionMode, _ new: InteractionMode) -> Void,
+        onOverlayChanged: @escaping () -> Void,
+        onUnconfirmedChanged: @escaping (_ visible: Bool) -> Void,
+        onPresentedPanelChanged: @escaping (_ route: PanelRoute?) -> Void,
+        onDrawingSettingChanged: @escaping () -> Void,
+    ) -> some View {
+        self
+            .onChangeCompat(of: canvas.wrappedValue) { _, _ in
+                onCanvasChanged()
+            }
+            .onChangeCompat(of: interactionMode.wrappedValue) { _, newValue in
+                let oldValue = lastInteractionMode.wrappedValue
+                lastInteractionMode.wrappedValue = newValue
+                onModeChanged(oldValue, newValue)
+            }
+            .onChangeCompat(of: drawingSettings.wrappedValue) { _, _ in
+                onDrawingSettingChanged()
+            }
+            .onChangeCompat(of: overlayRects.wrappedValue) { _, _ in
+                onOverlayChanged()
+            }
+            .onChangeCompat(of: selectedRectIDs.wrappedValue) { _, _ in
+                onOverlayChanged()
+            }
+            .onChangeCompat(of: isUnconfirmedPartsVisible.wrappedValue) { _, visible in
+                onUnconfirmedChanged(visible)
+            }
+            .onChangeCompat(of: presentedPanel.wrappedValue) { _, route in
+                onPresentedPanelChanged(route)
+            }
+    }
+}
 
-    var toolBinding: Binding<DrawMode> {
-        Binding(
-            get: { drawingSettings.tool },
-            set: { drawingSettings.tool = $0 }
+
+ZoomPanDrawingPlaygound/OperationScreen/DrawingPackage.swift
+----------------------------------------
+import Foundation
+
+/// アプリ側で保持・保存する描画データのパッケージ
+///
+/// - DrawingKit の internal 型（Stroke や Element など）に直接依存しない
+/// - JSON としてローカル保存・将来のマイグレーションを想定
+/// - imageKey / drawingKey により保存単位を一意に識別する
+struct DrawingPackage: Codable {
+
+    /// パッケージのバージョン
+    /// - フォーマット変更時のマイグレーション判定に使用
+    /// - JSON を読む側で switch できるようにするため Int で保持
+    var packageVersion: Int = 1
+
+    /// 元画像を識別するキー
+    /// - 例: 画像URL、UUID、プロジェクトID + ページ番号など
+    /// - DrawingLocalStore ではディレクトリ名として使われる
+    var imageKey: String
+
+    /// 同一 imageKey 内での描画バリエーション識別子
+    /// - 例: "autosave", "manual", "v1", "edit-20260213" など
+    /// - ファイル名（drawingKey.json）として使われる
+    var drawingKey: String
+
+    /// 作成日時
+    /// - 初回保存時にセット
+    /// - 履歴表示や並び替えに利用可能
+    var createdAt: Date = Date()
+
+    /// 更新日時
+    /// - 保存するたびに更新する想定
+    /// - autosave / 手動保存の判定にも使える
+    var updatedAt: Date = Date()
+
+    /// DrawingCanvasView.exportDrawingData() から取得した生データ
+    ///
+    /// - DrawingKit 内部の構造を JSON に露出させないため Data として保持
+    /// - 将来 DrawingKit 側の実装が変わっても互換性を保ちやすい
+    /// - 実体は JSON / バイナリ / 圧縮データ いずれでもOK
+    var drawingData: Data
+}
+
+
+ZoomPanDrawingPlaygound/Mock/ProjectSeedFactory.swift
+----------------------------------------
+import Foundation
+import YamatoAPIKit
+import YamatoAppContracts
+
+public enum ProjectSeedFactory {
+
+    /// ProjectSeed 単体生成（ここは “単体の生成” のみに責務を絞る）
+    public static func make(
+        projectID: String,
+        seed: String,
+        name: String = "配管工事プロジェクトA（検証）"
+    ) -> ProjectSeed {
+
+        let thumbnailURL = URL(string: "https://picsum.photos/seed/\(seed)-thumb/300/300")
+
+        let drawingURLs: [URL] = [
+            URL(string: "https://picsum.photos/seed/\(seed)-draw-1/1200/800")!,
+            URL(string: "https://picsum.photos/seed/\(seed)-draw-2/1200/800")!,
+            URL(string: "https://picsum.photos/seed/\(seed)-draw-3/1200/800")!
+        ]
+
+        return ProjectSeed(
+            id: projectID,
+            name: name,
+            thumbnailURL: thumbnailURL,
+            drawingImageURLs: drawingURLs,
+            instructionNumbers: ["12-3456", "12-3456-ALT01"],
+            linkIDs: ["L-\(projectID)-A", "L-\(projectID)-B"],
+            memoURL: .dummyMemo,
+            pipeListURL: .dummyPipeList,
+            checkbackUserGeneral: "一般ユーザー太郎",
+            checkbackAtGeneral: Date(timeIntervalSince1970: 1_706_525_600),
+            checkbackUserCenter: "加工センター花子",
+            checkbackAtCenter: Date(timeIntervalSince1970: 1_706_531_000)
         )
     }
+}
 
-    var stampKindBinding: Binding<StampKind> {
-        Binding(
-            get: { drawingSettings.stamp.kind },
-            set: { drawingSettings.stamp.kind = $0 }
+
+ZoomPanDrawingPlaygound/Mock/ProjectSeedCollectionFactory.swift
+----------------------------------------
+import Foundation
+
+/// “整合したデータセット” を一箇所で作る
+/// - payload と stub の元になる seed 群をここで決める
+public enum ProjectSeedCollectionFactory {
+
+    /// entry + links を必ず整合した状態で返す
+    public static func makeLinkProjects(
+        entryProjectID: String,
+        entrySeed: String,
+        linkCount: Int = 6
+    ) -> (entry: ProjectSeed, all: [ProjectSeed]) {
+
+        let entry = ProjectSeedFactory.make(
+            projectID: entryProjectID,
+            seed: "\(entrySeed)-entry",
+            name: "エントリープロジェクト"
+        )
+
+        let links: [ProjectSeed] = (0..<linkCount).map { i in
+            let pid = "\(entryProjectID)-LINK-\(i+1)"
+            let seed = "\(entrySeed)-link-\(i+1)"
+            return ProjectSeedFactory.make(
+                projectID: pid,
+                seed: seed,
+                name: "リンクプロジェクト\(i+1)"
+            )
+        }
+
+        return (entry: entry, all: [entry] + links)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/Mock/ProjectSeed.swift
+----------------------------------------
+import Foundation
+import YamatoAPIKit
+import YamatoAppContracts
+
+/// Preview / Mock 両方で使う「プロジェクトの元データ」
+/// ここが “唯一の真実（SSOT）” になる
+public struct ProjectSeed: Sendable {
+    public let id: String
+    public let name: String
+
+    public let thumbnailURL: URL?
+    public let drawingImageURLs: [URL]
+
+    public let instructionNumbers: [String]
+    public let linkIDs: [String]
+
+    public let memoURL: URL?
+    public let pipeListURL: URL?
+
+    public let checkbackUserGeneral: String?
+    public let checkbackAtGeneral: Date?
+    public let checkbackUserCenter: String?
+    public let checkbackAtCenter: Date?
+
+    public init(
+        id: String,
+        name: String,
+        thumbnailURL: URL?,
+        drawingImageURLs: [URL],
+        instructionNumbers: [String],
+        linkIDs: [String],
+        memoURL: URL?,
+        pipeListURL: URL?,
+        checkbackUserGeneral: String?,
+        checkbackAtGeneral: Date?,
+        checkbackUserCenter: String?,
+        checkbackAtCenter: Date?
+    ) {
+        self.id = id
+        self.name = name
+        self.thumbnailURL = thumbnailURL
+        self.drawingImageURLs = drawingImageURLs
+        self.instructionNumbers = instructionNumbers
+        self.linkIDs = linkIDs
+        self.memoURL = memoURL
+        self.pipeListURL = pipeListURL
+        self.checkbackUserGeneral = checkbackUserGeneral
+        self.checkbackAtGeneral = checkbackAtGeneral
+        self.checkbackUserCenter = checkbackUserCenter
+        self.checkbackAtCenter = checkbackAtCenter
+    }
+}
+
+// MARK: - Converters
+
+public extension ProjectSeed {
+    func toDisplayProject() -> ProjectDisplayProject {
+        ProjectDisplayProject(
+            id: id,
+            name: name,
+            thumbnailURL: thumbnailURL,
+            drawingImageURLs: drawingImageURLs,
+            instructionNumbers: instructionNumbers,
+            linkIDs: linkIDs,
+            memoURL: memoURL,
+            pipeListURL: pipeListURL,
+            checkbackUserGeneral: checkbackUserGeneral,
+            checkbackAtGeneral: checkbackAtGeneral,
+            checkbackUserCenter: checkbackUserCenter,
+            checkbackAtCenter: checkbackAtCenter
         )
     }
+}
 
-    var activeColorBinding: Binding<Color> {
-        Binding(
-            get: {
-                switch drawingSettings.tool {
-                case .stamp: return drawingSettings.stamp.color
-                default: return drawingSettings.pen.color
-                }
-            },
-            set: { newValue in
-                switch drawingSettings.tool {
-                case .stamp: drawingSettings.stamp.color = newValue
-                default: drawingSettings.pen.color = newValue
+public extension ProjectSeed {
+    func toProjectStubDTO() -> ProjectStubDTO {
+        ProjectStubDTO(
+            id: id,
+            name: name,
+            thumbnailURL: thumbnailURL,
+            checkbackUserGeneral: checkbackUserGeneral,
+            checkbackAtGeneral: checkbackAtGeneral,
+            checkbackUserCenter: checkbackUserCenter,
+            checkbackAtCenter: checkbackAtCenter,
+            instructionNumbers: instructionNumbers,
+            drawingImageURLs: drawingImageURLs,
+            linkIDs: linkIDs,
+            pipeListURL: pipeListURL,
+            memoURL: memoURL
+        )
+    }
+}
+
+
+ZoomPanDrawingPlaygound/Mock/PreviewPayloadFactory.swift
+----------------------------------------
+import Foundation
+import YamatoAPIKit
+import YamatoAppContracts
+
+public enum PreviewPayloadFactory {
+
+    public static func makeProjectOpenPayload(
+        projectID: String = "P-12-3456-001",
+        seed: String = "yamato-demo"
+    ) -> ProjectOpenPayload {
+
+        let auth = AuthSession(
+            token: "mock-token-\(seed)",
+            id: 1,
+            name: "Mock User",
+            roles: [.admin]
+        )
+
+        // payload も “整合済み seed 集合” から作る
+        let (entry, _) = ProjectSeedCollectionFactory.makeLinkProjects(
+            entryProjectID: projectID,
+            entrySeed: seed,
+            linkCount: 6
+        )
+
+        let project = entry.toDisplayProject()
+        let selectedDrawingURL: URL? = entry.drawingImageURLs.first
+
+        let cacheKey: ProjectOpenPayload.CacheKey? = .init(
+            projectID: projectID,
+            kind: .drawing(url: selectedDrawingURL ?? entry.drawingImageURLs[0])
+        )
+
+        return ProjectOpenPayload(
+            authSession: auth,
+            project: project,
+            selectedDrawingURL: selectedDrawingURL,
+            cacheKey: cacheKey
+        )
+    }
+}
+
+
+ZoomPanDrawingPlaygound/Mock/ProjectStubDTO.swift
+----------------------------------------
+import Foundation
+
+/// ProjectDTO が decode できる形の “JSON生成用” DTO
+public struct ProjectStubDTO: Encodable {
+    let id: String
+    let name: String
+    let thumbnailURL: URL?
+
+    let checkbackUserGeneral: String?
+    let checkbackAtGeneral: Date?
+
+    let checkbackUserCenter: String?
+    let checkbackAtCenter: Date?
+
+    let instructionNumbers: [String]
+    let drawingImageURLs: [URL]
+    let linkIDs: [String]
+
+    let pipeListURL: URL?
+    let memoURL: URL?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "project_id"
+        case name = "project_name"
+        case thumbnailURL = "project_thumbnail_url"
+
+        case checkbackUserGeneral = "checkback_user_general"
+        case checkbackAtGeneral = "checkback_at_general"
+
+        case checkbackUserCenter = "checkback_user_center"
+        case checkbackAtCenter = "checkback_at_center"
+
+        case instructionNumbers = "instruction_numbers"
+        case drawingImageURLs = "project_drawing_image_urls"
+        case linkIDs = "link_ids"
+
+        case pipeListURL = "pipe_list_url"
+        case memoURL = "project_memo_url"
+    }
+}
+
+
+ZoomPanDrawingPlaygound/Mock/Dummy.swift
+----------------------------------------
+import Foundation
+import CoreGraphics
+import YamatoAPIKit
+
+extension URL {
+    static let dummyPipeList = URL(string: "app://dummy/pipe_list")!
+    static let dummyMemo = URL(string: "app://dummy/memo")!
+}
+
+public struct DummyPipeListFactory {
+
+    static func makeJSONData(
+        count: Int,
+        startX: CGFloat = 60,
+        startY: CGFloat = 60,
+        stepX: CGFloat = 80,
+        stepY: CGFloat = 80,
+        rectSize: CGSize = CGSize(width: 40, height: 30)
+    ) throws -> Data {
+
+        var items: [PipeItemDTO] = []
+        let columns = Int(sqrt(Double(count)).rounded(.up))
+
+        for i in 0..<count {
+            let col = i % columns
+            let row = i / columns
+
+            let originX = startX + CGFloat(col) * stepX
+            let originY = startY + CGFloat(row) * stepY
+
+            let isChecked = i % 5 == 0
+
+            let item = PipeItemDTO(
+                pipeCheckID: "P-\(String(format: "%03d", i + 1))",
+                pipeName: "部材\(i + 1)",
+                checkbackInfo: CheckbackInfoDTO(
+                    checkbacked: isChecked,
+                    checkbackUser: isChecked ? "ダミーユーザー" : nil,
+                    checkbackAt: isChecked ? Date(timeIntervalSince1970: 1_800_000_000) : nil
+                ),
+                dxfRect: RectDTO(
+                    origin: PointDTO(x: originX, y: originY),
+                    size: SizeDTO(x: rectSize.width, y: rectSize.height)
+                ),
+                imageRect: RectDTO(
+                    origin: PointDTO(x: originX, y: originY),
+                    size: SizeDTO(x: rectSize.width, y: rectSize.height)
+                )
+            )
+
+            items.append(item)
+        }
+
+        let response = PipeListResponseDTO(pipeList: items)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        return try encoder.encode(response)
+    }
+}
+
+/// ダミー用メモ生成
+public enum DummyMemoFactory {
+
+    public static func makeText(
+        projectID: String,
+        projectName: String
+    ) -> String {
+
+        """
+        【ダミーメモ】
+        プロジェクトID: \(projectID)
+        プロジェクト名: \(projectName)
+
+        ・このメモはダミーです
+        ・pipe_list と同様、app://dummy スキーム時のみ使用されます
+        ・UI / 保存 / 編集動作確認用
+
+        TODO:
+        - 現地確認
+        - 再チェック対象あり
+        - 加工センターへ連絡
+
+        更新日時: \(iso(Date()))
+        """
+    }
+
+    private static func iso(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f.string(from: date)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/ZoomPanDrawingPlaygoundApp.swift
+----------------------------------------
+//
+//  ZoomPanDrawingPlaygoundApp.swift
+//  ZoomPanDrawingPlaygound
+//
+//  Created by 飯島 大樹 on 2026/01/19.
+//
+
+import SwiftUI
+import YamatoAPIKit
+
+@main
+struct ZoomPanDrawingPlaygoundApp: App {
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+        }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/RootView.swift
+----------------------------------------
+import SwiftUI
+import YamatoAPIKit
+import YamatoAppContracts
+
+@available(iOS 16.0, *)
+struct RootView: View {
+    let tokenStore: TokenStore = UserDefaultsTokenStore(key: "auth.token")
+    let useMock = true
+
+    @State private var services: YamatoServices? = nil
+    @State private var isBooting: Bool = true
+
+    // ✅ ここを “唯一の起点” にする（payload と stub を同じ seed で作る）
+    private let entryProjectID: String = "12345"
+    private let entrySeed: String = "yamato-demo"
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isBooting {
+                    ProgressView("初期化中…")
+                } else if let services {
+                    let payload = PreviewPayloadFactory.makeProjectOpenPayload(
+                        projectID: entryProjectID,
+                        seed: entrySeed
+                    )
+
+                    OperationScreen(
+                        services: services,
+                        payload: payload,
+                        selectedImageURL: payload.selectedDrawingURL ?? payload.project.drawingImageURLs.first ?? URL(string: "https://picsum.photos/seed/fallback/1200/800")!
+                    )
+                } else {
+                    VStack(spacing: 12) {
+                        Text("Servicesの初期化に失敗しました")
+                        Button("再試行") { boot() }
+                    }
+                    .padding()
                 }
             }
-        )
+            .task {
+                if services == nil { boot() }
+            }
+        }
     }
 
-    var activeSizeBinding: Binding<CGFloat> {
-        Binding(
-            get: {
-                switch drawingSettings.tool {
-                case .stamp: return drawingSettings.stamp.size
-                default: return drawingSettings.pen.width
+    private func boot() {
+        isBooting = true
+        Task {
+            if useMock {
+                let s = YamatoMock.makeServices(
+                    tokenStore: tokenStore,
+                    baseURL: URL(string: "https://mock.local")!
+                )
+
+                setupMockStubs(entryProjectID: entryProjectID, seed: entrySeed)
+
+                await MainActor.run {
+                    self.services = s
+                    self.isBooting = false
                 }
-            },
-            set: { newValue in
-                switch drawingSettings.tool {
-                case .stamp: drawingSettings.stamp.size = newValue
-                default: drawingSettings.pen.width = newValue
+            } else {
+                let s = await YamatoServices(tokenStore: tokenStore)
+                await MainActor.run {
+                    self.services = s
+                    self.isBooting = false
                 }
             }
-        )
+        }
     }
 
-    var activeOpacityBinding: Binding<CGFloat> {
-        Binding(
-            get: {
-                switch drawingSettings.tool {
-                case .stamp: return drawingSettings.stamp.opacity
-                default: return drawingSettings.pen.opacity
-                }
-            },
-            set: { newValue in
-                switch drawingSettings.tool {
-                case .stamp: drawingSettings.stamp.opacity = newValue
-                default: drawingSettings.pen.opacity = newValue
-                }
+    private func setupMockStubs(entryProjectID: String, seed: String) {
+        YamatoMockAPI.reset()
+
+        // どの endpoint にも当たらない場合の fallback
+        MockStubStore.shared.setDefaultStub(.init(statusCode: 200, body: Data("[]".utf8)))
+
+        YamatoMockAPI.presetDynamicTree(
+            rootProjects: 6, rootFolders: 2,
+            childrenProjects: 3, childrenFolders: 1,
+            depth: 1, seed: 42
+        )
+
+        // linkProjects も payload も “同じ seed” から生成する
+        let (_, seeds) = ProjectSeedCollectionFactory.makeLinkProjects(
+            entryProjectID: entryProjectID,
+            entrySeed: seed,
+            linkCount: 4
+        )
+
+        let dtoItems = seeds.map { $0.toProjectStubDTO() }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        let body = try! encoder.encode(dtoItems)
+        YamatoMockAPI.presetLinkProjects(for: entryProjectID, body: body)
+    }
+}
+
+
+ZoomPanDrawingPlaygound/ZoomPan/ZoomPanRepresentable.swift
+----------------------------------------
+import SwiftUI
+import UIKit
+
+struct ZoomPanRepresentable: UIViewRepresentable {
+
+    //  表示する画像
+    //  SwiftUI側から渡される
+    let image: UIImage
+
+    //  ZoomPanUIViewに渡すための橋渡し的な変数
+    var isTwoFingerPanOnly: Bool
+
+    //  SwiftUI側で監視できるようにする
+    @Binding var viewportState: ViewportState
+    @Binding var zoomRequest: ZoomRequest
+
+    func makeUIView(context: Context) -> ZoomPanUIView {
+
+        let zoomPanUIView = ZoomPanUIView()
+        zoomPanUIView.setImage(image)
+
+        //  ViewPortの更新を受けたらSwiftUI側の数値を変更して再描画
+        zoomPanUIView.onViewportChanged = { state in
+            DispatchQueue.main.async {
+                self.viewportState = state
             }
+        }
+
+        return zoomPanUIView
+    }
+
+    func updateUIView(_ uiView: UIViewType, context: Context) {
+        switch zoomRequest {
+        case .none:
+            break
+        case .reset:
+            uiView.resetViewport()
+            //  処理したら何もしない状態に戻す
+            DispatchQueue.main.async {
+                self.zoomRequest = .none
+            }
+        case let .set(scale, center):
+            uiView.setViewport(scale: scale, centerInImage: center)
+            //  処理したら何もしない状態に戻す
+            DispatchQueue.main.async {
+                self.zoomRequest = .none
+            }
+        }
+    }
+}
+
+
+ZoomPanDrawingPlaygound/ZoomPan/ZoomRequest.swift
+----------------------------------------
+import CoreGraphics
+
+enum ZoomRequest: Equatable {
+    case none  // 何もしない
+    case reset  // リセット
+    case set(scale: CGFloat, centerInImage: CGPoint)  // 指定スケール&指定画像座標へジャンプ
+}
+
+
+ZoomPanDrawingPlaygound/ZoomPan/ViewportState.swift
+----------------------------------------
+import CoreGraphics
+
+//  画面が描画している画像の情報
+struct ViewportState: Equatable {
+    var scale: CGFloat
+    var rotation: CGFloat  // 度
+    var translation: CGPoint
+    var centerInImage: CGPoint  // 今画面に写っている情報の画像中心地点
+    var visibleRectInImage: CGRect  // 画面が写している画像上の領域
+
+    //  .initialで使える初期状態を定義
+    static let initial = ViewportState(
+        scale: 1,
+        rotation: 0,
+        translation: .zero,
+        centerInImage: .zero,
+        visibleRectInImage: .zero
+    )
+}
+
+
+ZoomPanDrawingPlaygound/ZoomPan/ZoomPanUIView.swift
+----------------------------------------
+import UIKit
+
+final class ZoomPanUIView: UIView, UIGestureRecognizerDelegate {
+
+    // MARK: - UI
+    private let imageView = UIImageView()
+
+    // MARK: - State
+    private var viewportState = ViewportState.initial
+    var onViewportChanged: ((ViewportState) -> Void)?
+
+    // MARK: - Gestures
+    private lazy var panGR: UIPanGestureRecognizer = {
+        let g = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        g.minimumNumberOfTouches = 1
+        g.maximumNumberOfTouches = 2
+        g.cancelsTouchesInView = true
+        g.delegate = self
+        return g
+    }()
+
+    private lazy var pinchGR: UIPinchGestureRecognizer = {
+        let g = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        g.cancelsTouchesInView = true
+        g.delegate = self
+        return g
+    }()
+
+    // Representable から制御したい
+    func setOwnGesturesEnabled(_ enabled: Bool) {
+        panGR.isEnabled = enabled
+        pinchGR.isEnabled = enabled
+    }
+
+    func cancelAllGestures() {
+        gestureRecognizers?.forEach { g in
+            g.isEnabled = false
+            g.isEnabled = true
+        }
+    }
+
+    // MARK: - Init
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+    }
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    private func setup() {
+        backgroundColor = .clear
+
+        imageView.layer.anchorPoint = .zero
+        imageView.contentMode = .scaleAspectFit
+        imageView.frame = bounds
+        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(imageView)
+
+        addGestureRecognizer(panGR)
+        addGestureRecognizer(pinchGR)
+    }
+
+    // MARK: - Public API
+    func setImage(_ image: UIImage) {
+        imageView.image = image
+        updateDerivedViewportState()
+        onViewportChanged?(viewportState)
+    }
+
+    func resetViewport() {
+        viewportState = .initial
+        applyTransformAndNotify()
+    }
+
+    func setViewport(scale targetScale: CGFloat, centerInImage targetCenter: CGPoint) {
+        guard let image = imageView.image else { return }
+
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return }
+
+        // 画像座標 → imageViewローカル座標
+        let localX = drawRect.minX + (targetCenter.x / image.size.width) * drawRect.width
+        let localY = drawRect.minY + (targetCenter.y / image.size.height) * drawRect.height
+        let centerInImageView = CGPoint(x: localX, y: localY)
+
+        // 画面中心に持ってくる
+        let viewCenter = CGPoint(x: bounds.midX, y: bounds.midY)
+
+        viewportState.scale = targetScale
+        viewportState.translation = CGPoint(
+            x: viewCenter.x - targetScale * centerInImageView.x,
+            y: viewCenter.y - targetScale * centerInImageView.y
+        )
+
+        applyTransformAndNotify()
+    }
+
+    // Canvas側から forward されたジェスチャ
+    func handleExternalPan(_ g: UIPanGestureRecognizer) {
+        handlePanInternal(g, in: self)
+    }
+
+    func handleExternalPinch(_ g: UIPinchGestureRecognizer) {
+        handlePinchInternal(g, in: self)
+    }
+
+    // MARK: - UIGestureRecognizerDelegate
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool { true }
+
+    // MARK: - Gesture handlers
+    @objc private func handlePan(_ g: UIPanGestureRecognizer) {
+        handlePanInternal(g, in: self)
+    }
+
+    @objc private func handlePinch(_ g: UIPinchGestureRecognizer) {
+        handlePinchInternal(g, in: self)
+    }
+
+    private func handlePanInternal(_ g: UIPanGestureRecognizer, in view: UIView) {
+        guard g.state == .began || g.state == .changed else { return }
+
+        let delta = g.translation(in: view)
+        g.setTranslation(.zero, in: view)
+
+        viewportState.translation = CGPoint(
+            x: viewportState.translation.x + delta.x,
+            y: viewportState.translation.y + delta.y
+        )
+        applyTransformAndNotify()
+    }
+
+    private func handlePinchInternal(_ g: UIPinchGestureRecognizer, in view: UIView) {
+        guard g.state == .began || g.state == .changed else { return }
+
+        let anchorInView = g.location(in: view)
+
+        let scaleDelta = g.scale
+        g.scale = 1.0
+
+        let scaleBefore = viewportState.scale
+        let translationBefore = viewportState.translation
+
+        // anchor を「画像Viewローカル」として扱う
+        let anchorInImage = CGPoint(
+            x: (anchorInView.x - translationBefore.x) / max(0.0001, scaleBefore),
+            y: (anchorInView.y - translationBefore.y) / max(0.0001, scaleBefore)
+        )
+
+        let scaleAfter = scaleBefore * scaleDelta
+
+        let translationAfter = CGPoint(
+            x: anchorInView.x - (scaleAfter * anchorInImage.x),
+            y: anchorInView.y - (scaleAfter * anchorInImage.y)
+        )
+
+        viewportState.scale = scaleAfter
+        viewportState.translation = translationAfter
+        applyTransformAndNotify()
+    }
+
+    // MARK: - Transform / Notify
+    private func applyTransformAndNotify() {
+        applyTransform()
+        updateDerivedViewportState()
+        onViewportChanged?(viewportState)
+    }
+
+    private func applyTransform() {
+        let s = viewportState.scale
+        let t = viewportState.translation
+        imageView.transform = CGAffineTransform(a: s, b: 0, c: 0, d: s, tx: t.x, ty: t.y)
+    }
+
+    // MARK: - Geometry
+    private func imageDrawingRect(image: UIImage, in imageViewBounds: CGRect) -> CGRect {
+        let imageSize = image.size
+        let viewSize = imageViewBounds.size
+        guard imageSize.width > 0, imageSize.height > 0, viewSize.width > 0, viewSize.height > 0
+        else {
+            return .zero
+        }
+
+        let scaleW = viewSize.width / imageSize.width
+        let scaleH = viewSize.height / imageSize.height
+        let scale = min(scaleW, scaleH)
+
+        let w = imageSize.width * scale
+        let h = imageSize.height * scale
+        let x = (viewSize.width - w) / 2
+        let y = (viewSize.height - h) / 2
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    // view(画面) → image(画像座標)
+    public func viewPointToImagePoint(_ pInView: CGPoint) -> CGPoint? {
+        guard let image = imageView.image else { return nil }
+
+        // transform を打ち消して imageView ローカルへ
+        let inv = imageView.transform.inverted()
+        let pInImageView = pInView.applying(inv)
+
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return nil }
+
+        let nx = (pInImageView.x - drawRect.minX) / drawRect.width
+        let ny = (pInImageView.y - drawRect.minY) / drawRect.height
+
+        return CGPoint(x: nx * image.size.width, y: ny * image.size.height)
+    }
+
+    // image(画像座標) → view(画面)
+    public func imagePointToViewPoint(_ pInImage: CGPoint) -> CGPoint? {
+        guard let image = imageView.image else { return nil }
+
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return nil }
+
+        let localX = drawRect.minX + (pInImage.x / image.size.width) * drawRect.width
+        let localY = drawRect.minY + (pInImage.y / image.size.height) * drawRect.height
+        let pInImageView = CGPoint(x: localX, y: localY)
+
+        // imageViewローカル → 画面（transform適用）
+        return pInImageView.applying(imageView.transform)
+    }
+
+    private func updateDerivedViewportState() {
+        guard let image = imageView.image else { return }
+
+        let centerInView = CGPoint(x: bounds.midX, y: bounds.midY)
+        viewportState.centerInImage =
+            viewPointToImagePoint(centerInView)
+            ?? CGPoint(x: image.size.width / 2, y: image.size.height / 2)
+
+        let p0 = CGPoint(x: bounds.minX, y: bounds.minY)
+        let p1 = CGPoint(x: bounds.maxX, y: bounds.minY)
+        let p2 = CGPoint(x: bounds.minX, y: bounds.maxY)
+        let p3 = CGPoint(x: bounds.maxX, y: bounds.maxY)
+
+        let pts = [p0, p1, p2, p3].compactMap { viewPointToImagePoint($0) }
+        guard !pts.isEmpty else {
+            viewportState.visibleRectInImage = .zero
+            return
+        }
+
+        let minX = pts.map(\.x).min()!
+        let maxX = pts.map(\.x).max()!
+        let minY = pts.map(\.y).min()!
+        let maxY = pts.map(\.y).max()!
+
+        viewportState.visibleRectInImage = CGRect(
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
         )
     }
 
-    var eraserRadiusBinding: Binding<CGFloat> {
-        Binding(
-            get: { drawingSettings.eraser.radius },
-            set: { drawingSettings.eraser.radius = $0 }
-        )
+    public func viewLengthToImageLength(_ viewLen: CGFloat) -> CGFloat {
+        guard let image = imageView.image else { return viewLen }
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return viewLen }
+
+        let s = max(0.0001, viewportState.scale)  // 現在のズーム倍率
+        let kx = (image.size.width / drawRect.width) * (1.0 / s)
+        let ky = (image.size.height / drawRect.height) * (1.0 / s)
+        return viewLen * min(kx, ky)
+    }
+
+    public func imageLengthToViewLength(_ imageLen: CGFloat) -> CGFloat {
+        guard let image = imageView.image else { return imageLen }
+        let drawRect = imageDrawingRect(image: image, in: imageView.bounds)
+        guard drawRect.width > 0, drawRect.height > 0 else { return imageLen }
+
+        let s = max(0.0001, viewportState.scale)
+        let kx = (drawRect.width / image.size.width) * s
+        let ky = (drawRect.height / image.size.height) * s
+        return imageLen * min(kx, ky)
     }
 }
 

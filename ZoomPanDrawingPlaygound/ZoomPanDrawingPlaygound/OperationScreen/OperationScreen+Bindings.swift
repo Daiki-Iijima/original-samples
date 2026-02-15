@@ -1,77 +1,48 @@
 import DrawingKit
 import SwiftUI
 
-extension OperationScreen {
-
-    var toolBinding: Binding<DrawMode> {
-        Binding(
-            get: { drawingSettings.tool },
-            set: { drawingSettings.tool = $0 }
-        )
-    }
-
-    var stampKindBinding: Binding<StampKind> {
-        Binding(
-            get: { drawingSettings.stamp.kind },
-            set: { drawingSettings.stamp.kind = $0 }
-        )
-    }
-
-    var activeColorBinding: Binding<Color> {
-        Binding(
-            get: {
-                switch drawingSettings.tool {
-                case .stamp: return drawingSettings.stamp.color
-                default: return drawingSettings.pen.color
-                }
-            },
-            set: { newValue in
-                switch drawingSettings.tool {
-                case .stamp: drawingSettings.stamp.color = newValue
-                default: drawingSettings.pen.color = newValue
-                }
+// MARK: - Common binding applicator (そのまま使ってOK)
+extension View {
+    // iOS16 では old/new が取れないので lastInteractionMode を外から渡す
+    func applyBindingsForOperation(
+        canvas: Binding<DrawingCanvasView?>,
+        interactionMode: Binding<InteractionMode>,
+        lastInteractionMode: Binding<InteractionMode>,
+        drawingSettings: Binding<DrawingSettings>,
+        overlayRects: Binding<[CanvasRect]>,
+        selectedRectIDs: Binding<Set<UUID>>,
+        isUnconfirmedPartsVisible: Binding<Bool>,
+        presentedPanel: Binding<PanelRoute?>,
+        onCanvasChanged: @escaping () -> Void,
+        onModeChanged: @escaping (_ old: InteractionMode, _ new: InteractionMode) -> Void,
+        onOverlayChanged: @escaping () -> Void,
+        onUnconfirmedChanged: @escaping (_ visible: Bool) -> Void,
+        onPresentedPanelChanged: @escaping (_ route: PanelRoute?) -> Void,
+        onDrawingSettingChanged: @escaping () -> Void,
+    ) -> some View {
+        self
+            .onChangeCompat(of: canvas.wrappedValue) { _, _ in
+                onCanvasChanged()
             }
-        )
-    }
-
-    var activeSizeBinding: Binding<CGFloat> {
-        Binding(
-            get: {
-                switch drawingSettings.tool {
-                case .stamp: return drawingSettings.stamp.size
-                default: return drawingSettings.pen.width
-                }
-            },
-            set: { newValue in
-                switch drawingSettings.tool {
-                case .stamp: drawingSettings.stamp.size = newValue
-                default: drawingSettings.pen.width = newValue
-                }
+            .onChangeCompat(of: interactionMode.wrappedValue) { _, newValue in
+                let oldValue = lastInteractionMode.wrappedValue
+                lastInteractionMode.wrappedValue = newValue
+                onModeChanged(oldValue, newValue)
             }
-        )
-    }
-
-    var activeOpacityBinding: Binding<CGFloat> {
-        Binding(
-            get: {
-                switch drawingSettings.tool {
-                case .stamp: return drawingSettings.stamp.opacity
-                default: return drawingSettings.pen.opacity
-                }
-            },
-            set: { newValue in
-                switch drawingSettings.tool {
-                case .stamp: drawingSettings.stamp.opacity = newValue
-                default: drawingSettings.pen.opacity = newValue
-                }
+            .onChangeCompat(of: drawingSettings.wrappedValue) { _, _ in
+                onDrawingSettingChanged()
             }
-        )
-    }
-
-    var eraserRadiusBinding: Binding<CGFloat> {
-        Binding(
-            get: { drawingSettings.eraser.radius },
-            set: { drawingSettings.eraser.radius = $0 }
-        )
+            .onChangeCompat(of: overlayRects.wrappedValue) { _, _ in
+                onOverlayChanged()
+            }
+            .onChangeCompat(of: selectedRectIDs.wrappedValue) { _, _ in
+                onOverlayChanged()
+            }
+            .onChangeCompat(of: isUnconfirmedPartsVisible.wrappedValue) { _, visible in
+                onUnconfirmedChanged(visible)
+            }
+            .onChangeCompat(of: presentedPanel.wrappedValue) { _, route in
+                onPresentedPanelChanged(route)
+            }
     }
 }

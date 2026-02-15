@@ -149,7 +149,7 @@ struct UnconfirmedPartsPanelView: View {
                     .lineLimit(1)
 
                 // externalID があり、かつ name もある場合は補助として name を表示
-                if rect.externalID != nil, !rect.name.isEmpty {
+                if rect.pipeCheckBackID != nil, !rect.name.isEmpty {
                     Text(rect.name)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -190,7 +190,7 @@ struct UnconfirmedPartsPanelView: View {
     /// - 無ければ name
     /// - name も無ければプレースホルダ
     private func primaryTitle(for rect: CanvasRect) -> String {
-        if let ext = rect.externalID, !ext.isEmpty {
+        if let ext = rect.pipeCheckBackID, !ext.isEmpty {
             return ext
         }
         if !rect.name.isEmpty {
@@ -236,13 +236,13 @@ private struct UnconfirmedPartsPanelPreviewHost: View {
             rects: rects,
             selectedRectIDs: $selected,
             onZoom: { rect in
-                print("onZoom:", rect.externalID ?? rect.name)
+                print("onZoom:", rect.pipeCheckBackID ?? rect.name)
             },
             onCameraCheckback: { selectedRects in
                 print("onCameraCheckback count:", selectedRects.count)
             },
             onOpenProject: { pid, rect in
-                print("onOpenProject:", pid, rect?.externalID ?? rect?.name ?? "-")
+                print("onOpenProject:", pid, rect?.pipeCheckBackID ?? rect?.name ?? "-")
             }
         )
     }

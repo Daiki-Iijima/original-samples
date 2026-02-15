@@ -6,12 +6,13 @@
 //
 
 import SwiftUI
+import YamatoAPIKit
 
 @main
 struct ZoomPanDrawingPlaygoundApp: App {
     var body: some Scene {
         WindowGroup {
-            OperationScreen()
+            RootView()
         }
     }
 }

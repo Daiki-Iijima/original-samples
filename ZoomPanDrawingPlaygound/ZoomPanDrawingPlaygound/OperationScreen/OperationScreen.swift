@@ -1,248 +1,294 @@
 import DrawingKit
 import SwiftUI
 import UIKit
+import YamatoAPIKit
+import YamatoAppContracts
 
+// MARK: - OperationScreen
+/// ✅ Viewは「レイアウト」と「Viewにしか置けない参照」だけを持つ
+///
+/// なぜViewに残す？
+/// - DrawingCanvasView の参照（UIKit bridge）は View のライフサイクルに密接でStoreに置きにくい
+/// - sheet / overlayの表示構造はSwiftUIの責務
+///
+/// それ以外（状態やルール）はStoreへ
 struct OperationScreen: View {
-
+    
+    // MARK: External
+    let services: YamatoServices
+    let payload: ProjectOpenPayload
+    let selectedImageURL: URL
+    
+    // MARK: Env
     @Environment(\.horizontalSizeClass) private var hSizeClass
-    var isPhoneLayout: Bool { hSizeClass == .compact }
+    @Environment(\.scenePhase) private var scenePhase
+    private var isPhoneLayout: Bool { hSizeClass == .compact }
     
-    // 現在開いているプロジェクト（未確認部材一覧モードで有効）
-    @State var currentProjectID: String? = nil
-    //  プロジェクト切り替え時のズーム待機列
-    @State var pendingZoomRect: CanvasRect?
-
-    // iPhoneのsheet表示ルート
-    @State var presentedPanel: PanelRoute? = nil
-
-    // DrawingKit
-    @State var canvas: DrawingCanvasView?
-
-    // UIモード
-    @State var interactionMode: InteractionMode = .normal
-
-    // 描画設定
-    @State var drawingSettings = DrawingSettings()
-
-    // ZoomPan
-    @State var viewportState = ViewportState.initial
-    @State var zoomRequest: ZoomRequest = .none
+    // MARK: Store
+    @StateObject public var store: OperationStore
     
-    //  メモ周り
-    @State var memoText: String = ""
-    @State var memoPanelPos: CGPoint = .zero
-    @State var didInitMemoPanelPos: Bool = false
-    let memoPanelWidth: CGFloat = 360
+    // MARK: View-only references
+    /// UIKit bridge の参照：Viewからしか自然に管理しづらい
+    @State public var canvas: DrawingCanvasView? = nil
     
-    //  リンクプロジェクト周り
-    @State var linkProjectsPos: CGPoint = .zero
-    @State var didInitLinkProjectsPanelPos: Bool = false
-    let linkProjectsPanelWidth: CGFloat = 320
-
-    // iPad: 描画パネル位置
-    @State var panelPos: CGPoint = .zero
-    @State var didInitPanelPos: Bool = false
-    let panelWidth: CGFloat = 260
+    /// 既存ロジックが参照してるので保持（ズーム対象を一時保持など）
+    @State private var pendingZoomRect: CanvasRect? = nil
     
-    // 未確認部材一覧パネル（iPad）
-    @State var isUnconfirmedPartsVisible: Bool = false
-
-    @State var unconfirmedPartsPanelPos: CGPoint = .zero
-    @State var didInitUnconfirmedPartsPanelPos: Bool = false
-    let unconfirmedPartsPanelWidth: CGFloat = 320
-
-
-    // overlay rects
-    @State var overlayRects: [CanvasRect] = SampleData.overlayRects
-
-    // 選択
-    @State var selectedRectIDs: Set<UUID> = []
-
-    //  保存キー
-    //  Actionsで使用
-    @State var imageKey: String = "proj_a"
-    @State var drawingKey: String = "v1"
-
-    // Preset
-    @State var zoomPreset = ZoomPreset(centerX: 300, centerY: 300, scale: 2.0)
-    @State var rectPreset = RectPreset(centerX: 200, centerY: 200, width: 200, height: 140)
-
+    /// 設定を表示させるか
+    @State private var showConfigSheet: Bool = false
+    
+    // MARK: Init
+    init(services: YamatoServices, payload: ProjectOpenPayload, selectedImageURL: URL) {
+        self.services = services
+        self.payload = payload
+        self.selectedImageURL = selectedImageURL
+        _store = StateObject(
+            wrappedValue: OperationStore(
+                services: services,
+                payload: payload,
+                selectedImageURL: selectedImageURL
+            )
+        )
+    }
+    
+    // MARK: Body
     var body: some View {
-        ZStack(alignment: .top) {
-            canvasLayer
-
-            if isPhoneLayout {
-                VStack(spacing: 0) {
-                    OperationPhoneTopBar(
-                        interactionMode: $interactionMode,
-                        viewportScale: viewportState.scale,
-                        onBack: { /* dismiss */ },
-                        onResetZoom: { zoomRequest = .reset },
-                        onForceQuit: { /* your logic */ }
-                    )
-
-                    Spacer()
-
-                    OperationPhoneBottomBar(
-                        interactionMode: $interactionMode,
-                        presentedPanel: $presentedPanel,
-                        onUploadImage: { /* upload */ }
-                    )
-                    .padding(EdgeInsets(top: 0, leading: 8, bottom: 16, trailing: 8))
-                    
-                }
-                .ignoresSafeArea(edges: .bottom)
-            } else {
-                // iPad: 既存 topBarLayer + floating panels
-                topBarLayer
-                drawingSettingPanelLayer
-                memoPanelLayer
-                unconfirmedPartsPanelLayer
-                linkProjectsPanelLayer
+        ZStack {
+            content
+            
+            // StoreとModelの両方のローディングを1箇所で表示
+            if store.isBooting || store.model.isLoading {
+                loadingOverlay
             }
         }
-        .onChange(of: canvas) {
-            applyInteractionModeToCanvas()
-            syncCanvasToolState()
+        //  iPhone用
+        .sheet(item: presentedPanelBinding) { route in
+            IPhoneSheets(
+                route: route,
+                store: store,
+                canvas: $canvas,
+                saveMergedToPhotos: { img in
+                    saveMergedToPhotos(currentLoadedImage: img)
+                }
+            )
+        }
+        //  設定画面用
+        .sheet(isPresented: $showConfigSheet) {
+            OperationConfigView(onClose: { showConfigSheet = false })
+                .onDisappear {
+                    // 設定変更後の反映（overlayを作り直す）
+                    syncOverlayRects()
+                }
+        }
+        .task {
+            await store.boot()
+            syncOverlayRects()       // 初期反映（既存関数に繋ぐ）
+        }
+        .onChangeCompat(of: store.config) { _, _ in
             syncOverlayRects()
         }
-        .onChange(of: interactionMode) {
-            applyInteractionModeToCanvas()
-            syncCanvasToolState()
+        .onChangeCompat(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await store.refreshProjectsIfNeeded()
+                syncOverlayRects()
+            }
         }
-        .onChange(of: drawingSettings) {
-            syncCanvasToolState()
-        }
-        .onChange(of: overlayRects) {
+        .onChangeCompat(of: store.overlayRects) { _, _ in
+            // rect元データが更新されたら表示用へ再合成して反映
             syncOverlayRects()
         }
-        .onChange(of: selectedRectIDs) {
-            syncOverlayRects()
-        }
-        .onChange(of: isUnconfirmedPartsVisible) { newValue in
-            setUnconfirmedPartsVisible(newValue)
-        }
-        .onChange(of: presentedPanel) { newValue in
-            setUnconfirmedPartsVisible(newValue == .unconfirmedParts)
-        }
-        .onChange(of: interactionMode) { old, new in
-            closePanelsForModeSwitch(from: old, to: new)
-            applyInteractionModeToCanvas()
-            syncCanvasToolState()
-        }
-        .sheet(item: $presentedPanel) { route in
-            phoneSheet(for: route)
+        .applyBindingsForOperation(
+            canvas: $canvas,
+            
+            // Storeの@PublishedをBindingにして既存バインド資産へ渡す
+            interactionMode: interactionModeBinding,
+            lastInteractionMode: lastInteractionModeBinding,
+            drawingSettings: drawingSettingsBinding,
+            overlayRects: overlayRectsBinding,
+            selectedRectIDs: selectedRectIDsBinding,
+            isUnconfirmedPartsVisible: isUnconfirmedPartsVisibleBinding,
+            presentedPanel: presentedPanelBinding,
+            
+            onCanvasChanged: {
+                // “キャンバスが作られた/差し替わった” タイミングはView側で反映するのが自然
+                applyInteractionModeToCanvas()
+                syncCanvasToolState()
+                syncOverlayRects()
+            },
+            onModeChanged: { old, new in
+                store.closePanelsForModeSwitch(from: old, to: new)
+                applyInteractionModeToCanvas()
+                syncCanvasToolState()
+            },
+            onOverlayChanged: {
+                syncOverlayRects()
+            },
+            onUnconfirmedChanged: { visible in
+                store.setUnconfirmedPartsVisible(visible)
+                syncOverlayRects()
+            },
+            onPresentedPanelChanged: { route in
+                store.setUnconfirmedPartsVisible(route == .unconfirmedParts)
+                syncOverlayRects()
+            },
+            onDrawingSettingChanged: {
+                syncCanvasToolState()
+                applyInteractionModeToCanvas() // ツール切替時にmodeも確実に更新
+            }
+        )
+    }
+}
+
+// MARK: - View composition
+extension OperationScreen {
+    
+    private var content: some View {
+        ZStack(alignment: .top) {
+            canvasLayer
+            
+            if isPhoneLayout {
+                phoneOverlay
+            } else {
+                ipadOverlay
+            }
         }
     }
     
-    @State var isMemoVisible: Bool = false
-    @State var isLinkProjectsVisible: Bool = false
-    @State var isDrawingSettingsPanelVisible: Bool = true
+    private var phoneOverlay: some View {
+        VStack(spacing: 0) {
+            OperationPhoneTopBar(
+                interactionMode: interactionModeBinding,
+                viewportScale: store.viewportState.scale,
+                onBack: { /* dismiss */ },
+                onResetZoom: { store.zoomRequest = .reset },
+                onForceQuit: { /* your logic */ },
+                onOpenConfig: { showConfigSheet = true}
+            )
+            
+            Spacer()
+            
+            OperationPhoneBottomBar(
+                interactionMode: interactionModeBinding,
+                presentedPanel: presentedPanelBinding,
+                onUploadImage: { /* upload */ }
+            )
+            .padding(.init(top: 0, leading: 8, bottom: 16, trailing: 8))
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+    
+    private var ipadOverlay: some View {
+        Group {
+            topBarLayer
+            IPadPanels(
+                store: store,
+                canvas: $canvas,
+                openProject: openProject,
+                setUnconfirmedPartsVisible: setUnconfirmedPartsVisible,
+                saveMergedToPhotos: saveMergedToPhotos
+            )
+        }
+    }
     
     private var topBarLayer: some View {
-        // クロージャは let で先に型を確定させてから渡す
-        let onBack: () -> Void = { /*dismiss()*/ }
-        let onResetZoom: () -> Void = { zoomRequest = .reset }
-        let onUploadImage: () -> Void = { /*uploadImage()*/ }
-        let onSaveLocal: () -> Void = { saveDrawingLocal() }
-        let onLoadLocal: () -> Void = { loadDrawingLocal() }
-        let onSavePhotos: () -> Void = { /*saveDrawingToPhotos()*/ }
-
+        let onBack: () -> Void = { /* dismiss */ }
+        let onResetZoom: () -> Void = { store.zoomRequest = .reset }
+        let onUploadImage: () -> Void = { /* upload */ }
+        
+        let onSaveLocal: () -> Void = {
+            saveDrawingLocal(imageName: store.currentLoadedImage.name, userName: payload.authSession.name)
+        }
+        let onLoadLocal: () -> Void = {
+            loadDrawingLocal(imageName: store.currentLoadedImage.name, userName: payload.authSession.name)
+        }
+        
         return OperationiPadTopBar(
-            interactionMode: $interactionMode,
-            viewportScale: viewportState.scale,
-            imageKey: $imageKey,
-            drawingKey: $drawingKey,
-            isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
-            isMemoVisible: $isMemoVisible,
-            isLinkProjectsVisible: $isLinkProjectsVisible,
-            isDrawingSettingsPanelVisible: $isDrawingSettingsPanelVisible,
+            interactionMode: interactionModeBinding,
+            viewportScale: store.viewportState.scale,
+            isUnconfirmedPartsVisible: isUnconfirmedPartsVisibleBinding,
+            isMemoVisible: isMemoVisibleBinding,
+            isLinkProjectsVisible: isLinkProjectsVisibleBinding,
+            isDrawingSettingsPanelVisible: isDrawingSettingsPanelVisibleBinding,
             onBack: onBack,
             onResetZoom: onResetZoom,
             onUploadImage: onUploadImage,
             onSaveLocal: onSaveLocal,
             onLoadLocal: onLoadLocal,
-            onSavePhotos: onSavePhotos
+            onSavePhotos: { },
+            onOpenConfig: { showConfigSheet = true }
         )
         .padding()
     }
-
-    private func setUnconfirmedPartsVisible(_ visible: Bool) {
-        isUnconfirmedPartsVisible = visible
-
-        if visible {
-            // 初回表示時：未確認Rectがあるなら、その先頭プロジェクトを開く
-            let unconfirmed = overlayRects.filter { !$0.isHidden && !$0.isChecked }
-            if currentProjectID == nil {
-                currentProjectID = unconfirmed.first?.projectID
-            }
-        } else {
-            // モード外は overlay 無効（既存要件）
-            currentProjectID = nil
-            selectedRectIDs.removeAll()
-        }
-
-        syncOverlayRects()
-    }
-
-    private func closePanelsForModeSwitch(from old: InteractionMode, to new: InteractionMode) {
-
-        // まず「全部閉じる」を基本にして、
-        // 必要なものだけ後で開く方が事故が少ない
-        isUnconfirmedPartsVisible = false
-        isMemoVisible = false
-        isLinkProjectsVisible = false
-        isDrawingSettingsPanelVisible = false
-        presentedPanel = nil
-
-        switch new {
-        case .normal:
-            // normal は必要なら何も開かない（ユーザーがトグルで開く）
-            break
-
-        case .drawing:
-            // drawing ではツール選択だけ残す、など
-            // isDrawingSettingsPanelVisible = true  // もし自動で開きたいなら
-            break
-
-        case .camera:
-            // camera は強制的に他を閉じるだけ
-            break
-
-        default:
-            break
-        }
-    }
     
-    func openProject(projectID: String,zoomRect: CanvasRect?) {
-        // 1) 現在プロジェクト切替
-        currentProjectID = projectID
-
-        // 2) 画像切替（例：projectID をそのままキーにする）
-        imageKey = projectID   // 例: "proj_a" / "proj_b" / "proj_c"
-        // ※ Assets の画像名が違うなら map を用意してここで変換
-
-        // 3) 選択を跨がせたくないならクリア
-//        selectedRectIDs.removeAll()
-
-        // 4) overlay 再描画
-        syncOverlayRects()
-        
-        guard let rect = zoomRect else { return }
-
-        // 次の runloop で zoom を投げる（Canvas 再生成後）
-        DispatchQueue.main.async {
-            let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
-            zoomRequest = .set(
-                scale: max(viewportState.scale, 2.0),
-                centerInImage: c
-            )
-            pendingZoomRect = nil
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.18).ignoresSafeArea()
+            ProgressView("読み込み中…")
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 }
 
+// MARK: - Bindings (ObservableObject -> Binding)
+extension OperationScreen {
+    
+    /// SwiftUIの `ObservableObject` は `@Published` を `$store.xxx` で直接渡せないため
+    /// ここで “既存のBinding依存コード” に繋ぐためのBindingを用意する
+    
+    private var presentedPanelBinding: Binding<PanelRoute?> {
+        Binding(get: { store.presentedPanel }, set: { store.presentedPanel = $0 })
+    }
+    
+    private var interactionModeBinding: Binding<InteractionMode> {
+        Binding(get: { store.interactionMode }, set: { store.interactionMode = $0 })
+    }
+    
+    private var lastInteractionModeBinding: Binding<InteractionMode> {
+        Binding(get: { store.lastInteractionMode }, set: { store.lastInteractionMode = $0 })
+    }
+    
+    private var drawingSettingsBinding: Binding<DrawingSettings> {
+        Binding(get: { store.drawingSettings }, set: { store.drawingSettings = $0 })
+    }
+    
+    private var overlayRectsBinding: Binding<[CanvasRect]> {
+        Binding(get: { store.overlayRects }, set: { store.overlayRects = $0 })
+    }
+    
+    private var selectedRectIDsBinding: Binding<Set<UUID>> {
+        Binding(get: { store.selectedRectIDs }, set: { store.selectedRectIDs = $0 })
+    }
+    
+    private var isUnconfirmedPartsVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isUnconfirmedPartsVisible }, set: { store.isUnconfirmedPartsVisible = $0 })
+    }
+    
+    private var isMemoVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isMemoVisible }, set: { store.isMemoVisible = $0 })
+    }
+    
+    private var isLinkProjectsVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isLinkProjectsVisible }, set: { store.isLinkProjectsVisible = $0 })
+    }
+    
+    private var isDrawingSettingsPanelVisibleBinding: Binding<Bool> {
+        Binding(get: { store.isDrawingSettingsPanelVisible }, set: { store.isDrawingSettingsPanelVisible = $0 })
+    }
+}
 
-#Preview {
-    OperationScreen()
+// MARK: - Overlay sync (View -> Canvas)
+extension OperationScreen {
+    
+    /// Canvasへ渡す “表示用rect” をStoreのルールで作って反映する
+    ///
+    /// なぜView？
+    /// - `canvas?.setOverlayRects(...)` はUIKit参照を触るのでView側が責務を持つ
+    public func syncOverlayRects() {
+        let display = store.makeDisplayOverlayRects()
+        canvas?.setOverlayRects(display)
+    }
 }

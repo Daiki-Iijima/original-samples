@@ -10,8 +10,6 @@ struct OperationiPadTopBar: View {
     @Binding var interactionMode: InteractionMode
     let viewportScale: CGFloat
 
-    @Binding var imageKey: String
-    @Binding var drawingKey: String
     @Binding var isUnconfirmedPartsVisible: Bool
 
     // 2段目で使いそうなやつ（必要に応じて増やす）
@@ -25,6 +23,7 @@ struct OperationiPadTopBar: View {
     var onSaveLocal: () -> Void
     var onLoadLocal: () -> Void
     var onSavePhotos: () -> Void
+    var onOpenConfig: () -> Void
 
     var body: some View {
         VStack(spacing: 8) {
@@ -51,6 +50,7 @@ struct OperationiPadTopBar: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
+                
                 Button {
                 } label: {
                     Label("強制終了", systemImage: "")
@@ -65,6 +65,17 @@ struct OperationiPadTopBar: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                
+                Button {
+                    onOpenConfig()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.headline)
+                        .frame(width: 44, height: 34)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
             }
 
             // --------------------
@@ -73,8 +84,6 @@ struct OperationiPadTopBar: View {
             // --------------------
             OperationiPadTopBarSecondRow(
                 interactionMode: $interactionMode,
-                imageKey: $imageKey,
-                drawingKey: $drawingKey,
                 isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
                 isMemoVisible: $isMemoVisible,
                 isLinkProjectsVisible: $isLinkProjectsVisible,
@@ -110,9 +119,6 @@ struct OperationiPadTopBar: View {
 struct OperationiPadTopBarSecondRow: View {
     @Binding var interactionMode: InteractionMode
 
-    @Binding var imageKey: String
-    @Binding var drawingKey: String
-
     @Binding var isUnconfirmedPartsVisible: Bool
     @Binding var isMemoVisible: Bool
     @Binding var isLinkProjectsVisible: Bool
@@ -139,8 +145,6 @@ struct OperationiPadTopBarSecondRow: View {
             
             Spacer()
 
-//            keyFieldsAndIO
-
         case .drawing:
             TogglePillButton(title: "ツール選択", isOn: $isSettingsPanelVisible, systemImage: "slider.horizontal.3")
             Button {
@@ -160,29 +164,8 @@ struct OperationiPadTopBarSecondRow: View {
             .buttonStyle(.plain)
 
             Spacer()
-
-//            keyFieldsAndIO
-
         default:
             Spacer()
-//            keyFieldsAndIO
-        }
-    }
-
-    // 共通（Key入力 + IO）
-    private var keyFieldsAndIO: some View {
-        HStack(spacing: 10) {
-            TextField("imageKy", text: $imageKey)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 140)
-
-            TextField("drawingKey", text: $drawingKey)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 120)
-
-            Button("Save(Local)") { onSaveLocal() }
-            Button("Load(Local)") { onLoadLocal() }
-            Button("Save(Photos)") { onSavePhotos() }
         }
     }
 }
@@ -206,8 +189,6 @@ struct OperationiPadTopBarSecondRow: View {
             OperationiPadTopBar(
                 interactionMode: $interactionMode,
                 viewportScale: 1.23,
-                imageKey: $imageKey,
-                drawingKey: $drawingKey,
                 isUnconfirmedPartsVisible: $isUnconfirmedPartsVisible,
                 isMemoVisible: $isMemoVisible,
                 isLinkProjectsVisible: $isLinkProjectsVisible,
@@ -217,7 +198,8 @@ struct OperationiPadTopBarSecondRow: View {
                 onUploadImage: {},
                 onSaveLocal: {},
                 onLoadLocal: {},
-                onSavePhotos: {}
+                onSavePhotos: {},
+                onOpenConfig: {},
             )
             .padding()
         }
