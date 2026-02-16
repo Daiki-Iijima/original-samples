@@ -1,11 +1,17 @@
 import DrawingKit
+import YamatoScannerFeature
 import SwiftUI
 import UIKit
 import YamatoAPIKit
 import YamatoAppContracts
 
+public enum OperationScreenMode: Equatable, Sendable {
+    case normal
+    case checkback
+}
+
 // MARK: - OperationScreen
-/// ✅ Viewは「レイアウト」と「Viewにしか置けない参照」だけを持つ
+///  Viewは「レイアウト」と「Viewにしか置けない参照」だけを持つ
 ///
 /// なぜViewに残す？
 /// - DrawingCanvasView の参照（UIKit bridge）は View のライフサイクルに密接でStoreに置きにくい
@@ -37,11 +43,25 @@ struct OperationScreen: View {
     /// 設定を表示させるか
     @State private var showConfigSheet: Bool = false
     
+    /// 全画面表示用の状態
+    @State private var fullScreenRoute: FullScreenRoute? = nil
+    
+    @State private var mode: OperationScreenMode = .normal
+    
+    //  チェックバック中かどうか
+    @State private var isCheckbackSending: Bool = false
+    @State private var checkbackError: String? = nil
+
     // MARK: Init
-    init(services: YamatoServices, payload: ProjectOpenPayload, selectedImageURL: URL) {
+    init(
+        services: YamatoServices,
+        payload: ProjectOpenPayload,
+        selectedImageURL: URL,
+    ) {
         self.services = services
         self.payload = payload
         self.selectedImageURL = selectedImageURL
+        
         _store = StateObject(
             wrappedValue: OperationStore(
                 services: services,
@@ -49,6 +69,14 @@ struct OperationScreen: View {
                 selectedImageURL: selectedImageURL
             )
         )
+    }
+    
+    private var isCheckbackOnly: Bool {
+        if case .checkback = mode {
+            return true
+        }
+        
+        return false
     }
     
     // MARK: Body
@@ -59,6 +87,10 @@ struct OperationScreen: View {
             // StoreとModelの両方のローディングを1箇所で表示
             if store.isBooting || store.model.isLoading {
                 loadingOverlay
+            }
+            
+            if store.isCheckingBack {
+                loadingOverlay("チェックバック送信中…")
             }
         }
         //  iPhone用
@@ -82,11 +114,13 @@ struct OperationScreen: View {
         }
         .task {
             await store.boot()
+            
             syncOverlayRects()       // 初期反映（既存関数に繋ぐ）
         }
         .onChangeCompat(of: store.config) { _, _ in
             syncOverlayRects()
         }
+        //  画面が再描画されたら実行
         .onChangeCompat(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task {
@@ -94,7 +128,8 @@ struct OperationScreen: View {
                 syncOverlayRects()
             }
         }
-        .onChangeCompat(of: store.overlayRects) { _, _ in
+        .onChangeCompat(of: store.renderingRects) { _, _ in
+            
             // rect元データが更新されたら表示用へ再合成して反映
             syncOverlayRects()
         }
@@ -117,6 +152,8 @@ struct OperationScreen: View {
                 syncOverlayRects()
             },
             onModeChanged: { old, new in
+                //  チェックバックモードではモードチェンジできないように
+                guard !isCheckbackOnly else { return }
                 store.closePanelsForModeSwitch(from: old, to: new)
                 applyInteractionModeToCanvas()
                 syncCanvasToolState()
@@ -133,11 +170,51 @@ struct OperationScreen: View {
                 syncOverlayRects()
             },
             onDrawingSettingChanged: {
+                //  チェックバックモードでは描画ツールも触らせない
+                guard !isCheckbackOnly else { return }
+                
                 syncCanvasToolState()
                 applyInteractionModeToCanvas() // ツール切替時にmodeも確実に更新
             }
         )
+        .fullScreenCover(item: $fullScreenRoute) { route in
+            switch route {
+            case .pipeScanner(let projectID):
+                PipeCollectScannerView(
+                    projectID: projectID,
+                    service: PipeCheckServiceAdapter(services: services),
+                    onFinish: { items in
+//                        store.collectedPipes = items
+                        
+                        //  デモデータ追加
+                        let demo = ScanItemDemoFactenum.make(
+                              projectID: store.currentProjectID!
+                          )
+                        
+                        mode = .checkback
+                        store.acceptCollectedPipes(demo)
+                        fullScreenRoute = nil
+                    }
+                )
+            }
+        }
     }
+    
+    private func loadingOverlay(_ title: String) -> some View {
+        ZStack {
+            Color.black.opacity(0.18).ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                ProgressView()
+                Text(title)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
 }
 
 // MARK: - View composition
@@ -147,13 +224,64 @@ extension OperationScreen {
         ZStack(alignment: .top) {
             canvasLayer
             
-            if isPhoneLayout {
-                phoneOverlay
-            } else {
-                ipadOverlay
+            if isCheckbackOnly{
+                checkbackOnlyOverlay
+            }else{
+                if isPhoneLayout {
+                    phoneOverlay
+                } else {
+                    ipadOverlay
+                }
             }
+            
         }
     }
+    
+    
+    private var checkbackOnlyOverlay: some View {
+        Group {
+            // ✅上部に最低限の戻る/完了ボタンだけ欲しいならここ
+            // 何も要らないなら消してOK
+            VStack {
+                HStack {
+                    Button("戻る") { /* dismiss */ }
+                    Spacer()
+                    .disabled(store.isCheckingBack || store.selectedRectIDs.isEmpty)
+                }
+                .padding()
+                Spacer()
+            }
+
+            // 未確認部材一覧パネルをチェックバックパネルとして使う
+            //  チェックバックパネル1枚だけ表示
+            IPadPanels(
+                visiblePanels: [.checkback],
+                store: store,
+                canvas: $canvas,
+                openProject: store.openProject,
+                setUnconfirmedPartsVisible: setUnconfirmedPartsVisible,
+                saveMergedToPhotos: saveMergedToPhotos,
+                selectedRectsAction: { canvasRects in
+                    Task{
+                        await store.checkBackSelectedPipes()
+                    }
+                }
+            )
+            
+            if isCheckbackSending {
+                ZStack {
+                    Color.black.opacity(0.12).ignoresSafeArea()
+                    ProgressView("チェックバック送信中…")
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                        .background(.regularMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+
+        }
+    }
+
     
     private var phoneOverlay: some View {
         VStack(spacing: 0) {
@@ -182,11 +310,17 @@ extension OperationScreen {
         Group {
             topBarLayer
             IPadPanels(
+                visiblePanels: .default,
                 store: store,
                 canvas: $canvas,
-                openProject: openProject,
+                openProject: store.openProject,
                 setUnconfirmedPartsVisible: setUnconfirmedPartsVisible,
-                saveMergedToPhotos: saveMergedToPhotos
+                saveMergedToPhotos: saveMergedToPhotos,
+                selectedRectsAction: {_ in
+                    Task{
+                        await store.checkBackSelectedPipes()
+                    }
+                }
             )
         }
     }
@@ -216,6 +350,11 @@ extension OperationScreen {
             onSaveLocal: onSaveLocal,
             onLoadLocal: onLoadLocal,
             onSavePhotos: { },
+            onOpenPipeScanner: {
+                if let projectID = store.currentProjectID {
+                    fullScreenRoute = .pipeScanner(projectID: projectID)
+                }
+            },
             onOpenConfig: { showConfigSheet = true }
         )
         .padding()
@@ -256,7 +395,7 @@ extension OperationScreen {
     }
     
     private var overlayRectsBinding: Binding<[CanvasRect]> {
-        Binding(get: { store.overlayRects }, set: { store.overlayRects = $0 })
+        Binding(get: { store.renderingRects }, set: { store.renderingRects = $0 })
     }
     
     private var selectedRectIDsBinding: Binding<Set<UUID>> {

@@ -1,4 +1,5 @@
 import Foundation
+import YamatoAppContracts
 import CoreGraphics
 import YamatoAPIKit
 
@@ -93,3 +94,63 @@ public enum DummyMemoFactory {
         return f.string(from: date)
     }
 }
+
+// ScanItem の検証用ダミーデータ
+enum ScanItemDemoFactenum {
+    static func make(projectID: String) -> [ScanItem] {
+        [
+            ScanItem(
+                value: "A-100",
+                results: [
+                    PipeCheckEntry(
+                        projectID: projectID,
+                        pipeName: "部材2",
+                        pipeCheckID: "P-002",      // ✅PipeListに合わせる
+                        checkbacked: false,
+                        checkbackUser: nil,
+                        checkbackAt: nil
+                    )
+                ],
+                state: .matchUncheck
+            ),
+            ScanItem(
+                value: "B-200",
+                results: [
+                    PipeCheckEntry(
+                        projectID: projectID,
+                        pipeName: "部材6",
+                        pipeCheckID: "P-006",      // ✅i%5==0ならチェック済みにも一致
+                        checkbacked: true,
+                        checkbackUser: "一般ユーザー太郎",
+                        checkbackAt: Date().addingTimeInterval(-3600)
+                    )
+                ],
+                state: .matchCheckback
+            ),
+            ScanItem(
+                value: "C-300",
+                results: [
+                    PipeCheckEntry(
+                        projectID: projectID,
+                        pipeName: "部材3",
+                        pipeCheckID: "P-003",      // ✅同一プロジェクト内
+                        checkbacked: false,
+                        checkbackUser: nil,
+                        checkbackAt: nil
+                    ),
+                    PipeCheckEntry(
+                        projectID: "\(projectID)-LINK-\(2)",
+                        pipeName: "部材3",
+                        pipeCheckID: "P-003",      // ✅別プロジェクト側も用意するなら PipeListも別PJ分必要
+                        checkbacked: false,
+                        checkbackUser: nil,
+                        checkbackAt: nil
+                    )
+                ],
+                state: .matchUncheck
+            ),
+            ScanItem(value: "X-999", results: [], state: .notFound)
+        ]
+    }
+}
+

@@ -47,8 +47,11 @@ struct IPhoneSheets: View {
         case .unconfirmedParts:
             VStack(spacing: 0) {
                 UnconfirmedPartsPanelView(
-                    rects: store.overlayRects.filter { !$0.isHidden && !$0.isChecked },
+                    rects: store.renderingRects.filter { !$0.isHidden && !$0.isChecked },
                     selectedRectIDs: $store.selectedRectIDs,
+                    mode: .review,
+                    actionButtonText: "カメラチャックバック",
+                    checkingPipeIDs: store.checkingPipeIDs,
                     onZoom: { rect in
                         let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
                         store.zoomRequest = .set(
@@ -56,7 +59,7 @@ struct IPhoneSheets: View {
                             centerInImage: c
                         )
                     },
-                    onCameraCheckback: { _ in },
+                    onTapActionButtn: { _ in },
                     onOpenProject: { pid, rect in
                         store.openProject(projectID: pid, zoomRect: rect)
                         store.presentedPanel = nil

@@ -8,6 +8,12 @@ struct LoadedImage: Sendable {
     let name: String
     let image: UIImage
     let url: URL
+    
+    init(name: String, image: UIImage, url: URL) {
+        self.name = name
+        self.image = image
+        self.url = url
+    }
 
     init(url: URL) async throws {
         self.url = url
@@ -50,11 +56,4 @@ struct LoadedImage: Sendable {
             url: URL(string: "about:blank")!
         )
     }()
-
-    // private init（initial用）
-    private init(name: String, image: UIImage, url: URL) {
-        self.name = name
-        self.image = image
-        self.url = url
-    }
 }

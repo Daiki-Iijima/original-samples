@@ -11,6 +11,7 @@
 		A68BCA962F3DF39400A13110 /* DrawingKit in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCA952F3DF39400A13110 /* DrawingKit */; };
 		A68BCAF22F3DFA1500A13110 /* YamatoAPIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCAF12F3DFA1500A13110 /* YamatoAPIKit */; };
 		A68BCAF52F3DFF6500A13110 /* YamatoAppContracts in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCAF42F3DFF6500A13110 /* YamatoAppContracts */; };
+		A68BCC2D2F41ACC000A13110 /* YamatoScannerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCC2C2F41ACC000A13110 /* YamatoScannerFeature */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 				A68BCA962F3DF39400A13110 /* DrawingKit in Frameworks */,
 				A64898E82F1E307C0046550E /* DrawingKit in Frameworks */,
 				A68BCAF22F3DFA1500A13110 /* YamatoAPIKit in Frameworks */,
+				A68BCC2D2F41ACC000A13110 /* YamatoScannerFeature in Frameworks */,
 				A68BCAF52F3DFF6500A13110 /* YamatoAppContracts in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -88,6 +90,7 @@
 				A68BCA952F3DF39400A13110 /* DrawingKit */,
 				A68BCAF12F3DFA1500A13110 /* YamatoAPIKit */,
 				A68BCAF42F3DFF6500A13110 /* YamatoAppContracts */,
+				A68BCC2C2F41ACC000A13110 /* YamatoScannerFeature */,
 			);
 			productName = ZoomPanDrawingPlaygound;
 			productReference = A64898B82F1E2F620046550E /* ZoomPanDrawingPlaygound.app */;
@@ -121,6 +124,7 @@
 				A68BCA942F3DF39400A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/DrawingKit" */,
 				A68BCAF02F3DFA1500A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAPIKit" */,
 				A68BCAF32F3DFF6500A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAppContracts" */,
+				A68BCC2B2F41ACC000A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoScannerFeature" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A64898B92F1E2F620046550E /* Products */;
@@ -284,6 +288,7 @@
 				DEVELOPMENT_TEAM = C6BAJ38C74;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "使わせてクレメンス";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "テスト保存用";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -318,6 +323,7 @@
 				DEVELOPMENT_TEAM = C6BAJ38C74;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "使わせてクレメンス";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "テスト保存用";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -378,6 +384,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../../../Desktop/YamatoAppContracts;
 		};
+		A68BCC2B2F41ACC000A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoScannerFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../../Desktop/YamatoScannerFeature;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -396,6 +406,10 @@
 		A68BCAF42F3DFF6500A13110 /* YamatoAppContracts */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = YamatoAppContracts;
+		};
+		A68BCC2C2F41ACC000A13110 /* YamatoScannerFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YamatoScannerFeature;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

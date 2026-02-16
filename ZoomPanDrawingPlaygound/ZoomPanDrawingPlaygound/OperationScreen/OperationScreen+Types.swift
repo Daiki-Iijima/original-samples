@@ -32,6 +32,18 @@ struct RectPreset: Equatable {
     var height: CGFloat
 }
 
+// 全画面（fullScreenCover）用 route
+enum FullScreenRoute: Identifiable, Equatable {
+    case pipeScanner(projectID: String)
+
+    var id: String {
+        switch self {
+        case .pipeScanner(let projectID):
+            return "pipeScanner:\(projectID)"
+        }
+    }
+}
+
 enum SampleData {
     
     static let linkProjects: [LinkProjectItem] = {

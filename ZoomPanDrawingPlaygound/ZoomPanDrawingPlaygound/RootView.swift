@@ -96,5 +96,27 @@ struct RootView: View {
 
         let body = try! encoder.encode(dtoItems)
         YamatoMockAPI.presetLinkProjects(for: entryProjectID, body: body)
+        
+        YamatoMockAPI.pipeCheckBackSuccess(
+            ids: ["P-002", "P-003"],
+            results: [
+                .init(
+                    pipeCheckID: "P-002",
+                    pipeName: "部材2",
+                    checkbacked: true,
+                    checkbackUser: "ダミーユーザー",
+                    checkbackAt: Date()
+                ),
+                .init(
+                    pipeCheckID: "P-003",
+                    pipeName: "部材3",
+                    checkbacked: true,
+                    checkbackUser: "ダミーユーザー",
+                    checkbackAt: Date()
+                ),
+            ],
+            delay: 2.0
+        )
+
     }
 }

@@ -23,6 +23,7 @@ struct OperationiPadTopBar: View {
     var onSaveLocal: () -> Void
     var onLoadLocal: () -> Void
     var onSavePhotos: () -> Void
+    var onOpenPipeScanner: () -> Void
     var onOpenConfig: () -> Void
 
     var body: some View {
@@ -40,7 +41,17 @@ struct OperationiPadTopBar: View {
 
                 modeButton("確認モード", .normal)
                 modeButton("描画モード", .drawing)
-                modeButton("文字認識", .camera)
+                
+                Button {
+                    onOpenPipeScanner()
+                } label: {
+                    Text("文字認識")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
 
                 Spacer()
 
@@ -199,6 +210,7 @@ struct OperationiPadTopBarSecondRow: View {
                 onSaveLocal: {},
                 onLoadLocal: {},
                 onSavePhotos: {},
+                onOpenPipeScanner: {},
                 onOpenConfig: {},
             )
             .padding()

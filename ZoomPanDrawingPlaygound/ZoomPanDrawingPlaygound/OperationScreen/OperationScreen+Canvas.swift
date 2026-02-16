@@ -28,13 +28,13 @@ extension OperationScreen {
                 set: { store.zoomRequest = $0 }
             ),
             onTapImagePoint: { p in
-                // ✅ タップ→状態遷移ルールは Store に集約（Viewは「通知」だけ）
+                // タップ→状態遷移ルールは Store に集約（Viewは「通知」だけ）
                 store.handleTapOnCanvas(at: p)
-                // ✅ 見た目更新（canvas参照を触るのはViewの責務）
+                // 見た目更新（canvas参照を触るのはViewの責務）
                 syncOverlayRects()
             }
         )
-        // ✅ 画像が切り替わったらRepresentableを作り直してズレを防ぐ
+        // 画像が切り替わったらRepresentableを作り直してズレを防ぐ
         .id(store.currentLoadedImage.name)
     }
 

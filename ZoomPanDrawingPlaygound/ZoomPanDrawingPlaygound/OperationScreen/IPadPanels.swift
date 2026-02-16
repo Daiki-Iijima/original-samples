@@ -3,6 +3,19 @@ import DrawingKit
 import UIKit
 
 struct IPadPanels: View {
+    struct VisiblePanels: OptionSet {
+        let rawValue: Int
+        static let drawing       = VisiblePanels(rawValue: 1 << 0)
+        static let unconfirmed   = VisiblePanels(rawValue: 1 << 1)
+        static let memo          = VisiblePanels(rawValue: 1 << 2)
+        static let linkProjects  = VisiblePanels(rawValue: 1 << 3)
+        static let checkback     = VisiblePanels(rawValue: 1 << 4)
+
+        static let `default`: VisiblePanels = [.drawing, .unconfirmed, .memo, .linkProjects]
+    }
+    
+    let visiblePanels: VisiblePanels
+    
     //  MARK: - 外部から受け取る
     @ObservedObject var store: OperationStore
     @Binding var canvas: DrawingCanvasView?
@@ -11,16 +24,22 @@ struct IPadPanels: View {
     let openProject: (_ projectID: String, _ zoomRect: CanvasRect?) -> Void
     let setUnconfirmedPartsVisible: (_ visible: Bool) -> Void
     let saveMergedToPhotos: (_ currentLoadedImage: LoadedImage) -> Void
+    let selectedRectsAction: (_ selectedPipeRects: [CanvasRect]) -> Void
 
     var body: some View {
-        Group {
-            drawingSettingPanelLayer
-            unconfirmedPartsPanelLayer
-            memoPanelLayer
-            linkProjectsPanelLayer
-        }
-    }
+            Group {
+                if visiblePanels.contains(.drawing) { drawingSettingPanelLayer }
 
+                if visiblePanels.contains(.checkback) {
+                    checkbackPartsPanelLayer
+                } else if visiblePanels.contains(.unconfirmed) {
+                    unconfirmedPartsPanelLayer
+                }
+
+                if visiblePanels.contains(.memo) { memoPanelLayer }
+                if visiblePanels.contains(.linkProjects) { linkProjectsPanelLayer }
+            }
+        }
     @ViewBuilder
     private var drawingSettingPanelLayer: some View {
         if store.interactionMode == .drawing && store.isDrawingSettingsPanelVisible {
@@ -33,6 +52,7 @@ struct IPadPanels: View {
                     headerHeight: 44,
                     title: "ツール選択",
                     onClose: { store.isDrawingSettingsPanelVisible = false },
+                    isShowCloseButton: true,
                     trailing: { AnyView(EmptyView()) },
                     position: $store.panelPos,
                     didInitPosition: $store.didInitPanelPos
@@ -67,13 +87,17 @@ struct IPadPanels: View {
                     headerHeight: 44,
                     title: "未確認部材一覧",
                     onClose: { setUnconfirmedPartsVisible(false) },
+                    isShowCloseButton: true,
                     trailing: { AnyView(EmptyView()) },
                     position: $store.unconfirmedPartsPanelPos,
                     didInitPosition: $store.didInitUnconfirmedPartsPanelPos
                 ) {
                     UnconfirmedPartsPanelView(
-                        rects: store.overlayRects.filter { !$0.isHidden && !$0.isChecked },
+                        rects: store.renderingRects.filter { !$0.isHidden && !$0.isChecked },
                         selectedRectIDs: $store.selectedRectIDs,
+                        mode: .review,
+                        actionButtonText: "カメラチェックバック",
+                        checkingPipeIDs: store.checkingPipeIDs,
                         onZoom: { rect in
                             let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
                             store.zoomRequest = .set(
@@ -81,13 +105,54 @@ struct IPadPanels: View {
                                 centerInImage: c
                             )
                         },
-                        onCameraCheckback: { _ in },
+                        onTapActionButtn: { items in
+                            selectedRectsAction(items)
+                        },
                         onOpenProject: { pid, rect in openProject(pid, rect) }
                     )
                     .frame(minHeight: proxy.size.height * 2.0 / 3.0)
                 }
             }
             .ignoresSafeArea()
+        }
+    }
+    
+    @ViewBuilder
+    public var checkbackPartsPanelLayer: some View {
+        GeometryReader { proxy in
+            CommonFloatingPanel(
+                kind: .unconfirmedParts,
+                containerSize: proxy.size,
+                width: CGFloat(store.config.panels.unconfirmedParts),
+                margin: 12,
+                headerHeight: 44,
+                title: "チェックバック",
+                onClose: { setUnconfirmedPartsVisible(false) },
+                isShowCloseButton: false,
+                trailing: { AnyView(EmptyView()) },
+                position: $store.unconfirmedPartsPanelPos,
+                didInitPosition: $store.didInitUnconfirmedPartsPanelPos
+            ) {
+                UnconfirmedPartsPanelView(
+                    rects: store.checkbackPanelRects,
+                    selectedRectIDs: $store.selectedRectIDs,
+                    mode: .checkbackSelect,
+                    actionButtonText: "チェックバック実行",
+                    checkingPipeIDs: store.checkingPipeIDs,
+                    onZoom: { rect in
+                        let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
+                        store.zoomRequest = .set(
+                            scale: max(store.viewportState.scale, 2.0),
+                            centerInImage: c
+                        )
+                    },
+                    onTapActionButtn: { canvasRects in
+                        selectedRectsAction(canvasRects)
+                    },
+                    onOpenProject: { pid, rect in openProject(pid, rect) }
+                )
+                .frame(minHeight: proxy.size.height * 2.0 / 3.0)
+            }
         }
     }
 
@@ -103,6 +168,7 @@ struct IPadPanels: View {
                     headerHeight: 44,
                     title: "メモ",
                     onClose: { store.isMemoVisible = false },
+                    isShowCloseButton: true,
                     trailing: { AnyView(EmptyView()) },
                     position: $store.memoPanelPos,
                     didInitPosition: $store.didInitMemoPanelPos
@@ -130,6 +196,7 @@ struct IPadPanels: View {
                     headerHeight: 50,
                     title: "リンクプロジェクトリスト",
                     onClose: { store.isLinkProjectsVisible = false },
+                    isShowCloseButton: true,
                     trailing: { AnyView(EmptyView()) },
                     position: $store.linkProjectsPos,
                     didInitPosition: $store.didInitLinkProjectsPanelPos

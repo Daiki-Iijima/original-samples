@@ -10,6 +10,8 @@ struct CommonFloatingPanel<Content: View>: View {
 
     let title: String
     let onClose: () -> Void
+    
+    let isShowCloseButton: Bool
 
     /// 右上などに置く追加ボタン（任意）
     @ViewBuilder var trailing: () -> AnyView
@@ -25,7 +27,7 @@ struct CommonFloatingPanel<Content: View>: View {
             width: width,
             margin: margin,
             headerHeight: headerHeight,
-            position: $position
+            position: $position,
         ) {
             // 共通ヘッダー
             HStack(spacing: 10) {
@@ -39,7 +41,9 @@ struct CommonFloatingPanel<Content: View>: View {
 
                 trailing()
 
-                Button("閉じる", action: onClose)
+                if isShowCloseButton{
+                    Button("閉じる", action: onClose)
+                }
             }
             .padding(.horizontal, 12)
         } content: {

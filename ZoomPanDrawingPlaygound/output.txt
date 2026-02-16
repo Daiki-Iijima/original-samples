@@ -125,36 +125,22 @@ ZoomPanDrawingPlaygound/UI/Panels/UnconfirmedPartsPanelView.swift
 import SwiftUI
 import DrawingKit
 
-/// 未確認部材一覧パネル（ダミーUI）
-///
-/// - rects: 表示対象の矩形（OperationScreen側で「未確認のみ」などをフィルタして渡す想定）
-/// - selectedRectIDs: 選択状態（OperationScreenと共有して Canvas 側のハイライトとも連動させる）
 struct UnconfirmedPartsPanelView: View {
 
-    // 表示対象（OperationScreen側でフィルタして渡す）
     let rects: [CanvasRect]
-
-    // OperationScreenの選択と直結（複数選択可）
     @Binding var selectedRectIDs: Set<UUID>
 
-    // 行タップ時：該当Rectへズームさせる（呼び出し元で zoomRequest を発行）
-    var onZoom: (CanvasRect) -> Void = { _ in }
+    /// ✅ 追加：チェックバック送信中の pipeCheckID 群（表示用）
+    var checkingPipeIDs: Set<String> = []
 
-    // 下部ボタン押下時：選択中のRect一覧をまとめて返す
+    var onZoom: (CanvasRect) -> Void = { _ in }
     var onCameraCheckback: (_ selected: [CanvasRect]) -> Void = { _ in }
-    
-    // 行タップ時：そのプロジェクトを開く（画像切替・overlay再描画は呼び出し元がやる）
     var onOpenProject: (_ projectID: String, _ zoomRect: CanvasRect?) -> Void = { _,_  in }
 
-    // 選択があるかどうか（可読性のため）
     private var hasSelection: Bool { !selectedRectIDs.isEmpty }
 
-    /// プロジェクトごとにグルーピングした表示用セクション
-    /// - projectID は識別用（安定）
-    /// - projectName は表示用（UI）
     private var projectSections: [ProjectSection] {
         let dict = Dictionary(grouping: rects) { $0.projectID }
-
         return dict.map { (projectID, rects) in
             ProjectSection(
                 projectID: projectID,
@@ -162,26 +148,20 @@ struct UnconfirmedPartsPanelView: View {
                 rects: rects
             )
         }
-        // 表示順は projectName で揃える（ID順にしたいならここを projectID に）
         .sorted { $0.projectName.localizedStandardCompare($1.projectName) == .orderedAscending }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-
-            // パネル上部（全体件数・全解除など）
             headerRow
 
-            // 一覧本体
             ScrollView {
                 VStack(spacing: 0) {
                     if rects.isEmpty {
-                        // 空状態表示
                         Text("未確認の項目がありません")
                             .foregroundStyle(.secondary)
                             .padding(.vertical, 12)
                     } else {
-                        // プロジェクト単位のセクション表示
                         ForEach(projectSections) { section in
                             projectHeader(section)
 
@@ -194,10 +174,8 @@ struct UnconfirmedPartsPanelView: View {
                 }
             }
 
-            // 選択がある時だけチェックバックボタンを表示
             if hasSelection {
                 Button {
-                    // 選択中のRectを抽出してコールバックに渡す
                     let selected = rects.filter { selectedRectIDs.contains($0.id) }
                     onCameraCheckback(selected)
                 } label: {
@@ -212,22 +190,17 @@ struct UnconfirmedPartsPanelView: View {
         }
     }
 
-    // MARK: - Header (Panel)
-
     private var headerRow: some View {
         HStack {
-            Text("未確認部材数 : \(rects.count)")
+            Text("件数 : \(rects.count)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             Spacer()
 
-            // 選択がある時だけ全解除を表示
             if hasSelection {
-                Button("全解除") {
-                    selectedRectIDs.removeAll()
-                }
-                .font(.caption.weight(.semibold))
+                Button("全解除") { selectedRectIDs.removeAll() }
+                    .font(.caption.weight(.semibold))
             }
         }
         .padding(.horizontal, 16)
@@ -235,9 +208,6 @@ struct UnconfirmedPartsPanelView: View {
         .background(Color(.systemGray6))
     }
 
-    // MARK: - Header (Project Section)
-
-    /// プロジェクト見出し（ヘッダー）
     private func projectHeader(_ section: ProjectSection) -> some View {
         HStack(spacing: 8) {
             Text(section.projectName)
@@ -255,25 +225,18 @@ struct UnconfirmedPartsPanelView: View {
         .background(Color(.systemGray5))
     }
 
-    // MARK: - Row
-
-    /// 1行表示
-    /// - 右端チェックは「選択トグル」
-    /// - 行タップは「ズーム」（選択は変えない）
     @ViewBuilder
     private func row(_ rect: CanvasRect) -> some View {
         let isSelected = selectedRectIDs.contains(rect.id)
 
         HStack(spacing: 10) {
 
-            // メイン表示：externalID があればそれを優先
             VStack(alignment: .leading, spacing: 4) {
                 Text(primaryTitle(for: rect))
                     .font(.body)
                     .lineLimit(1)
 
-                // externalID があり、かつ name もある場合は補助として name を表示
-                if rect.externalID != nil, !rect.name.isEmpty {
+                if rect.pipeCheckBackID != nil, !rect.name.isEmpty {
                     Text(rect.name)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -283,7 +246,9 @@ struct UnconfirmedPartsPanelView: View {
 
             Spacer()
 
-            // 選択トグル（複数選択OK）
+            // ✅ ステータス（チェック済み/未チェック/送信中）
+            statusIcon(rect)
+
             Button {
                 toggle(rect.id)
             } label: {
@@ -294,36 +259,37 @@ struct UnconfirmedPartsPanelView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            isSelected
-                ? Color.accentColor.opacity(0.12)
-                : Color(.systemBackground)
-        )
-        // 行全体をタップ領域にする（チェックボタン以外のタップでズームしたい）
+        .background(isSelected ? Color.accentColor.opacity(0.12) : Color(.systemBackground))
         .contentShape(Rectangle())
         .onTapGesture {
-            // プロジェクトとズームを依頼
-            onOpenProject(rect.projectID,rect)
+            onOpenProject(rect.projectID, rect)
         }
     }
 
-    // MARK: - Helpers
+    @ViewBuilder
+    private func statusIcon(_ rect: CanvasRect) -> some View {
+        let pipeID = rect.pipeCheckBackID ?? ""
+        if !pipeID.isEmpty, checkingPipeIDs.contains(pipeID) {
+            ProgressView()
+                .scaleEffect(0.9)
+                .frame(width: 22, height: 22)
+        } else if rect.isChecked {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.green)
+        } else {
+            Image(systemName: "circle")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+        }
+    }
 
-    /// 行の主タイトル
-    /// - externalID があれば externalID
-    /// - 無ければ name
-    /// - name も無ければプレースホルダ
     private func primaryTitle(for rect: CanvasRect) -> String {
-        if let ext = rect.externalID, !ext.isEmpty {
-            return ext
-        }
-        if !rect.name.isEmpty {
-            return rect.name
-        }
+        if let ext = rect.pipeCheckBackID, !ext.isEmpty { return ext }
+        if !rect.name.isEmpty { return rect.name }
         return "（名称未設定）"
     }
 
-    /// 選択トグル
     private func toggle(_ id: UUID) {
         if selectedRectIDs.contains(id) {
             selectedRectIDs.remove(id)
@@ -333,43 +299,11 @@ struct UnconfirmedPartsPanelView: View {
     }
 }
 
-// MARK: - Section Model (View internal)
-
-/// View内でだけ使う、プロジェクト単位のセクションモデル
 private struct ProjectSection: Identifiable {
     let projectID: String
     let projectName: String
     let rects: [CanvasRect]
-
     var id: String { projectID }
-}
-
-#Preview {
-    UnconfirmedPartsPanelPreviewHost()
-}
-
-private struct UnconfirmedPartsPanelPreviewHost: View {
-    @State private var selected: Set<UUID> = []
-
-    // Preview用のダミーデータ
-    private let rects: [CanvasRect] = SampleData.overlayRects
-        .filter { !$0.isHidden && !$0.isChecked }  // 未確認だけ表示したいなら
-
-    var body: some View {
-        UnconfirmedPartsPanelView(
-            rects: rects,
-            selectedRectIDs: $selected,
-            onZoom: { rect in
-                print("onZoom:", rect.externalID ?? rect.name)
-            },
-            onCameraCheckback: { selectedRects in
-                print("onCameraCheckback count:", selectedRects.count)
-            },
-            onOpenProject: { pid, rect in
-                print("onOpenProject:", pid, rect?.externalID ?? rect?.name ?? "-")
-            }
-        )
-    }
 }
 
 
@@ -959,6 +893,8 @@ struct OperationiPadTopBar: View {
     var onSaveLocal: () -> Void
     var onLoadLocal: () -> Void
     var onSavePhotos: () -> Void
+    var onOpenPipeScanner: () -> Void
+    var onOpenConfig: () -> Void
 
     var body: some View {
         VStack(spacing: 8) {
@@ -975,7 +911,17 @@ struct OperationiPadTopBar: View {
 
                 modeButton("確認モード", .normal)
                 modeButton("描画モード", .drawing)
-                modeButton("文字認識", .camera)
+                
+                Button {
+                    onOpenPipeScanner()
+                } label: {
+                    Text("文字認識")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
 
                 Spacer()
 
@@ -984,6 +930,7 @@ struct OperationiPadTopBar: View {
                 Text(String(format: "ズーム倍率: %.2f", viewportScale))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                
                 
                 Button {
                 } label: {
@@ -999,6 +946,17 @@ struct OperationiPadTopBar: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                
+                Button {
+                    onOpenConfig()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.headline)
+                        .frame(width: 44, height: 34)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
             }
 
             // --------------------
@@ -1121,7 +1079,9 @@ struct OperationiPadTopBarSecondRow: View {
                 onUploadImage: {},
                 onSaveLocal: {},
                 onLoadLocal: {},
-                onSavePhotos: {}
+                onSavePhotos: {},
+                onOpenPipeScanner: {},
+                onOpenConfig: {},
             )
             .padding()
         }
@@ -1142,6 +1102,7 @@ struct OperationPhoneTopBar: View {
     var onBack: () -> Void
     var onResetZoom: () -> Void
     var onForceQuit: () -> Void
+    var onOpenConfig: () -> Void
 
     var body: some View {
         HStack() {
@@ -1173,6 +1134,15 @@ struct OperationPhoneTopBar: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
+            
+            Button(action: onOpenConfig) {
+                Image(systemName: "gearshape")
+                    .font(.headline)
+                    .frame(width: 44, height: 34)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
         }
         .padding(10)
         .background(.ultraThinMaterial)
@@ -1204,6 +1174,12 @@ struct LoadedImage: Sendable {
     let name: String
     let image: UIImage
     let url: URL
+    
+    init(name: String, image: UIImage, url: URL) {
+        self.name = name
+        self.image = image
+        self.url = url
+    }
 
     init(url: URL) async throws {
         self.url = url
@@ -1246,13 +1222,6 @@ struct LoadedImage: Sendable {
             url: URL(string: "about:blank")!
         )
     }()
-
-    // private init（initial用）
-    private init(name: String, image: UIImage, url: URL) {
-        self.name = name
-        self.image = image
-        self.url = url
-    }
 }
 
 
@@ -1262,7 +1231,7 @@ import Foundation
 import YamatoAPIKit
 import UIKit
 
-struct ProjectVM: Identifiable, Sendable {
+struct ProjectVM: Identifiable{
     let id: String
     var name: String
 
@@ -1439,24 +1408,32 @@ final class OperationScreenModel: ObservableObject {
     private func downloadThumbs(projects: [ProjectVM]) async -> [ProjectVM] {
         var next = projects
 
-        await withTaskGroup(of: (Int, LoadedImage?).self) { group in
+        await withTaskGroup(of: (Int, Data?).self) { group in
             for i in next.indices {
-                // entryは固定なのでスキップ
                 if next[i].id == entryProjectID { continue }
                 guard let url = next[i].thumbnailURL else { continue }
 
                 group.addTask {
                     do {
-                        let img = try await LoadedImage(url: url)
-                        return (i, img)
+                        let (data, resp) = try await URLSession.shared.data(from: url)
+                        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                            return (i, nil)
+                        }
+                        return (i, data)
                     } catch {
                         return (i, nil)
                     }
                 }
             }
 
-            for await (i, img) in group {
-                next[i].loadedThumb = img
+            for await (i, data) in group {
+                guard
+                    let data,
+                    let image = UIImage(data: data),
+                    let url = next[i].thumbnailURL
+                else { continue }
+
+                next[i].loadedThumb = LoadedImage(name: url.lastPathComponent, image: image, url: url)
             }
         }
 
@@ -1620,20 +1597,6 @@ import DrawingKit
 import UIKit
 
 struct IPadPanels: View {
-
-    //  iPadパネルの横幅パラメータ
-    //  高さは自動計算
-    enum Layout {
-        // お絵描きツール選択パネル
-        static let drawingToolSelectPanelWidth: CGFloat = 320
-        // 未確認部材選択パネル
-        static let unconfirmedPartsPanelWidth: CGFloat = 360
-        //  メモパネル
-        static let memoPanelWidth: CGFloat = 360
-        //  リンクプロジェクトパネル
-        static let linkProjectsPanelWidth: CGFloat = 360
-    }
-
     //  MARK: - 外部から受け取る
     @ObservedObject var store: OperationStore
     @Binding var canvas: DrawingCanvasView?
@@ -1659,7 +1622,7 @@ struct IPadPanels: View {
                 CommonFloatingPanel(
                     kind: .drawing,
                     containerSize: proxy.size,
-                    width: Layout.drawingToolSelectPanelWidth,
+                    width: CGFloat(store.config.panels.drawingTools),
                     margin: 12,
                     headerHeight: 44,
                     title: "ツール選択",
@@ -1693,7 +1656,7 @@ struct IPadPanels: View {
                 CommonFloatingPanel(
                     kind: .unconfirmedParts,
                     containerSize: proxy.size,
-                    width: Layout.unconfirmedPartsPanelWidth,
+                    width: CGFloat(store.config.panels.unconfirmedParts),
                     margin: 12,
                     headerHeight: 44,
                     title: "未確認部材一覧",
@@ -1705,6 +1668,7 @@ struct IPadPanels: View {
                     UnconfirmedPartsPanelView(
                         rects: store.overlayRects.filter { !$0.isHidden && !$0.isChecked },
                         selectedRectIDs: $store.selectedRectIDs,
+                        checkingPipeIDs: store.checkingPipeIDs,
                         onZoom: { rect in
                             let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
                             store.zoomRequest = .set(
@@ -1729,7 +1693,7 @@ struct IPadPanels: View {
                 CommonFloatingPanel(
                     kind: .memo,
                     containerSize: proxy.size,
-                    width: Layout.memoPanelWidth,
+                    width: CGFloat(store.config.panels.memo),
                     margin: 12,
                     headerHeight: 44,
                     title: "メモ",
@@ -1756,7 +1720,7 @@ struct IPadPanels: View {
                 CommonFloatingPanel(
                     kind: .linkProjects,
                     containerSize: proxy.size,
-                    width: Layout.linkProjectsPanelWidth,
+                    width: CGFloat(store.config.panels.linkProjects),
                     margin: 12,
                     headerHeight: 50,
                     title: "リンクプロジェクトリスト",
@@ -1880,14 +1844,14 @@ ZoomPanDrawingPlaygound/OperationScreen/Config/OperationConfigView.swift
 import SwiftUI
 
 struct OperationConfigView: View {
-
+    
     @ObservedObject private var store = OperationConfigStore.shared
-
+    
     /// 編集中のドラフト（保存ボタンで確定）
     @State private var draft: OperationConfig = .default
-
+    
     var onClose: () -> Void = {}
-
+    
     var body: some View {
         NavigationStack {
             Form {
@@ -1895,7 +1859,7 @@ struct OperationConfigView: View {
                 checkedSection
                 unconfirmedSection
                 panelWidthSection
-
+                
                 Section {
                     Button(role: .destructive) {
                         store.resetToDefault()
@@ -1923,51 +1887,59 @@ struct OperationConfigView: View {
             }
         }
     }
-
+    
     // MARK: - Sections
-
+    
     private var selectionSection: some View {
         Section("選択済み矩形") {
             colorRow("線の色", color: $draft.selection.strokeColor)
             sliderRow("線の透明度", value: $draft.selection.strokeAlpha, range: 0...1, format: "%.2f")
             sliderRow("線の太さ", value: $draft.selection.strokeWidth, range: 1...10, format: "%.0f")
-
+            
             Toggle("背景を塗る", isOn: $draft.selection.fillEnabled)
             colorRow("背景の色", color: $draft.selection.fillColor)
                 .disabled(!draft.selection.fillEnabled)
             sliderRow("背景の透明度", value: $draft.selection.fillAlpha, range: 0...1, format: "%.2f")
                 .disabled(!draft.selection.fillEnabled)
-        }
+            
+            colorRow("テキストの色", color: $draft.selection.textColor)
+            sliderRow("テキストの透明度", value: $draft.selection.textAlpha, range: 0...1, format: "%.2f")        }
     }
-
+    
     private var checkedSection: some View {
         Section("チェック済み矩形（常時表示）") {
             colorRow("線の色", color: $draft.checked.strokeColor)
             sliderRow("線の透明度", value: $draft.checked.strokeAlpha, range: 0...1, format: "%.2f")
             sliderRow("線の太さ", value: $draft.checked.strokeWidth, range: 1...10, format: "%.0f")
-
+            
             Toggle("背景を塗る", isOn: $draft.checked.fillEnabled)
             colorRow("背景の色", color: $draft.checked.fillColor)
                 .disabled(!draft.checked.fillEnabled)
             sliderRow("背景の透明度", value: $draft.checked.fillAlpha, range: 0...1, format: "%.2f")
                 .disabled(!draft.checked.fillEnabled)
+            
+            colorRow("テキストの色", color: $draft.checked.textColor)
+            sliderRow("テキストの透明度", value: $draft.checked.textAlpha, range: 0...1, format: "%.2f")
         }
     }
-
+    
     private var unconfirmedSection: some View {
         Section("未確認矩形（一覧ONの時だけ）") {
             colorRow("線の色", color: $draft.unconfirmed.strokeColor)
             sliderRow("線の透明度", value: $draft.unconfirmed.strokeAlpha, range: 0...1, format: "%.2f")
             sliderRow("線の太さ", value: $draft.unconfirmed.strokeWidth, range: 1...10, format: "%.0f")
-
+            
             Toggle("背景を塗る", isOn: $draft.unconfirmed.fillEnabled)
             colorRow("背景の色", color: $draft.unconfirmed.fillColor)
                 .disabled(!draft.unconfirmed.fillEnabled)
             sliderRow("背景の透明度", value: $draft.unconfirmed.fillAlpha, range: 0...1, format: "%.2f")
                 .disabled(!draft.unconfirmed.fillEnabled)
+            
+            colorRow("テキストの色", color: $draft.unconfirmed.textColor)
+            sliderRow("テキストの透明度", value: $draft.unconfirmed.textAlpha, range: 0...1, format: "%.2f")
         }
     }
-
+    
     private var panelWidthSection: some View {
         Section("パネル横幅（iPad）") {
             sliderRow("ツール選択", value: $draft.panels.drawingTools, range: 240...520, format: "%.0f")
@@ -1976,9 +1948,9 @@ struct OperationConfigView: View {
             sliderRow("リンク", value: $draft.panels.linkProjects, range: 260...600, format: "%.0f")
         }
     }
-
+    
     // MARK: - UI Parts
-
+    
     private func colorRow(_ title: String, color: Binding<HexColor>) -> some View {
         HStack {
             Text(title)
@@ -1991,7 +1963,7 @@ struct OperationConfigView: View {
             .labelsHidden()
         }
     }
-
+    
     private func sliderRow(
         _ title: String,
         value: Binding<Double>,
@@ -2025,15 +1997,24 @@ struct OperationConfig: Codable, Equatable, Sendable {
         var fillColor: HexColor = .init(hex: "#00C853")
         var fillAlpha: Double = 0.18
         var fillEnabled: Bool = true
+        
+        //  矩形の中の色
+        var textColor: HexColor = .init(hex: "#FFFFFF")
+        var textAlpha: Double = 1.0
     }
 
     struct CheckedStyle: Codable, Equatable, Sendable {
         var strokeColor: HexColor = .init(hex: "#1976D2") // blue
         var strokeAlpha: Double = 1.0
         var strokeWidth: Double = 2
+        
         var fillEnabled: Bool = false
         var fillAlpha: Double = 0.0
         var fillColor: HexColor = .init(hex: "#1976D2")
+        
+        //  矩形の中の色
+        var textColor: HexColor = .init(hex: "#FFFFFF")
+        var textAlpha: Double = 1.0
     }
 
     struct UnconfirmedStyle: Codable, Equatable, Sendable {
@@ -2044,6 +2025,10 @@ struct OperationConfig: Codable, Equatable, Sendable {
         var fillColor: HexColor = .init(hex: "#FBC02D")
         var fillAlpha: Double = 0.12
         var fillEnabled: Bool = true
+        
+        //  矩形の中の色
+        var textColor: HexColor = .init(hex: "#FFFFFF")
+        var textAlpha: Double = 1.0
     }
 
     struct PanelWidths: Codable, Equatable, Sendable {
@@ -2187,6 +2172,12 @@ private extension UIColor {
         let b = CGFloat(v & 0xFF) / 255.0
 
         self.init(red: r, green: g, blue: b, alpha: 1.0)
+    }
+}
+
+extension HexColor {
+    func uiColor(alpha: CGFloat) -> UIColor {
+        uiColor.withAlphaComponent(alpha)
     }
 }
 
@@ -2393,17 +2384,6 @@ extension OperationScreen {
         store.presentedPanel = nil
     }
 
-    // MARK: - Open Project
-
-    /// Rectタップ / リンクプロジェクト選択などでプロジェクトを開く
-    /// - currentProject を切り替え
-    /// - 必要ならそのRectへズーム要求を投げる（ZoomableDrawingRepresentable が処理）
-    func openProject(projectID: String, zoomRect: CanvasRect?) {
-        store.openProject(projectID: projectID, zoomRect: zoomRect)
-        
-        syncOverlayRects()
-    }
-
     // MARK: - Export / Local persistence
 
     /// iPhone フォトに「元画像 + お絵描き」をマージして保存
@@ -2501,6 +2481,7 @@ struct IPhoneSheets: View {
                 UnconfirmedPartsPanelView(
                     rects: store.overlayRects.filter { !$0.isHidden && !$0.isChecked },
                     selectedRectIDs: $store.selectedRectIDs,
+                    checkingPipeIDs: store.checkingPipeIDs,
                     onZoom: { rect in
                         let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
                         store.zoomRequest = .set(
@@ -2638,13 +2619,14 @@ extension IPhoneSheets {
 ZoomPanDrawingPlaygound/OperationScreen/OperationScreen.swift
 ----------------------------------------
 import DrawingKit
+import YamatoScannerFeature
 import SwiftUI
 import UIKit
 import YamatoAPIKit
 import YamatoAppContracts
 
 // MARK: - OperationScreen
-/// ✅ Viewは「レイアウト」と「Viewにしか置けない参照」だけを持つ
+///  Viewは「レイアウト」と「Viewにしか置けない参照」だけを持つ
 ///
 /// なぜViewに残す？
 /// - DrawingCanvasView の参照（UIKit bridge）は View のライフサイクルに密接でStoreに置きにくい
@@ -2672,6 +2654,12 @@ struct OperationScreen: View {
     
     /// 既存ロジックが参照してるので保持（ズーム対象を一時保持など）
     @State private var pendingZoomRect: CanvasRect? = nil
+    
+    /// 設定を表示させるか
+    @State private var showConfigSheet: Bool = false
+    
+    /// 全画面表示用の状態
+    @State private var fullScreenRoute: FullScreenRoute? = nil
     
     // MARK: Init
     init(services: YamatoServices, payload: ProjectOpenPayload, selectedImageURL: URL) {
@@ -2708,9 +2696,20 @@ struct OperationScreen: View {
                 }
             )
         }
+        //  設定画面用
+        .sheet(isPresented: $showConfigSheet) {
+            OperationConfigView(onClose: { showConfigSheet = false })
+                .onDisappear {
+                    // 設定変更後の反映（overlayを作り直す）
+                    syncOverlayRects()
+                }
+        }
         .task {
             await store.boot()
             syncOverlayRects()       // 初期反映（既存関数に繋ぐ）
+        }
+        .onChangeCompat(of: store.config) { _, _ in
+            syncOverlayRects()
         }
         .onChangeCompat(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
@@ -2762,6 +2761,24 @@ struct OperationScreen: View {
                 applyInteractionModeToCanvas() // ツール切替時にmodeも確実に更新
             }
         )
+        .fullScreenCover(item: $fullScreenRoute) { route in
+            switch route {
+            case .pipeScanner(let projectID):
+                PipeCollectScannerView(
+                    projectID: projectID,
+                    service: PipeCheckServiceAdapter(services: services),
+                    onFinish: { items in
+//                        store.collectedPipes = items
+                        let demo = ScanItemDemoFactory.make(
+                              projectID: store.currentProjectID!
+                          )
+                        
+                        store.collectedPipes = demo
+                        fullScreenRoute = nil
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -2787,7 +2804,8 @@ extension OperationScreen {
                 viewportScale: store.viewportState.scale,
                 onBack: { /* dismiss */ },
                 onResetZoom: { store.zoomRequest = .reset },
-                onForceQuit: { /* your logic */ }
+                onForceQuit: { /* your logic */ },
+                onOpenConfig: { showConfigSheet = true}
             )
             
             Spacer()
@@ -2808,7 +2826,7 @@ extension OperationScreen {
             IPadPanels(
                 store: store,
                 canvas: $canvas,
-                openProject: openProject,
+                openProject: store.openProject,
                 setUnconfirmedPartsVisible: setUnconfirmedPartsVisible,
                 saveMergedToPhotos: saveMergedToPhotos
             )
@@ -2839,7 +2857,13 @@ extension OperationScreen {
             onUploadImage: onUploadImage,
             onSaveLocal: onSaveLocal,
             onLoadLocal: onLoadLocal,
-            onSavePhotos: { }
+            onSavePhotos: { },
+            onOpenPipeScanner: {
+                if let projectID = store.currentProjectID {
+                    fullScreenRoute = .pipeScanner(projectID: projectID)
+                }
+            },
+            onOpenConfig: { showConfigSheet = true }
         )
         .padding()
     }
@@ -2943,69 +2967,90 @@ import Combine
 /// - SwiftUIのレイアウト（それはView）
 @MainActor
 final class OperationStore: ObservableObject {
-
+    
     // MARK: - External / fixed
-
+    
     let services: YamatoServices
     let payload: ProjectOpenPayload
     let selectedImageURL: URL
-
+    
     /// データ層（取得・統合・キャッシュ）
     let model: OperationScreenModel
-
+    
     // MARK: - Published (Viewが直接監視する状態)
-
+    
     // 現在表示対象のプロジェクト（未確認パネルで切替される）
     @Published var currentProjectID: String? = nil
-
+    
     // モードと描画設定（UI操作で切り替わる）
     @Published var interactionMode: InteractionMode = .normal
     @Published var drawingSettings: DrawingSettings = .init()
-
+    
     // entry画像（画面中固定）
     @Published var currentLoadedImage: LoadedImage = .initial
-
+    
     // ズームパン（キャンバス層が参照）
     @Published var viewportState: ViewportState = .initial
     @Published var zoomRequest: ZoomRequest = .none
-
+    
     // Overlayの“元データ”（全プロジェクト分）
     @Published var overlayRects: [CanvasRect] = []
-
+    
     // 未確認パネルでの選択状態（Rectを選択/解除）
     @Published public var selectedRectIDs: Set<UUID> = []
-
+    
     // Panels (shared)
     @Published var presentedPanel: PanelRoute? = nil
-
+    
     @Published var isMemoVisible: Bool = false
     @Published var isLinkProjectsVisible: Bool = false
     @Published var isDrawingSettingsPanelVisible: Bool = true
     @Published var isUnconfirmedPartsVisible: Bool = false
-
+    
     @Published var memoText: String = ""
-
+    
     // iPad floating positions（“UIの配置”だが、複数ビュー跨ぎで共有するため Store 管理）
     @Published var panelPos: CGPoint = CGPoint(x: 9999, y: 9999)
     @Published var didInitPanelPos: Bool = false
-
+    
     @Published var unconfirmedPartsPanelPos: CGPoint = CGPoint(x: 9999, y: 9999)
     @Published var didInitUnconfirmedPartsPanelPos: Bool = false
-
+    
     @Published var memoPanelPos: CGPoint = CGPoint(x: 9999, y: 9999)
     @Published var didInitMemoPanelPos: Bool = false
-
+    
     @Published var linkProjectsPos: CGPoint = CGPoint(x: 9999, y: 9999)
     @Published var didInitLinkProjectsPanelPos: Bool = false
-
+    
     // Loading（画面起動シーケンス）
     @Published var isBooting: Bool = false
-
+    
     // iOS16 old/new workaround（以前ViewにあったものをStoreへ移す）
     @Published var lastInteractionMode: InteractionMode = .normal
-
+    
+    //  設定
+    @Published var config: OperationConfig = .default
+    private var cancellables: Set<AnyCancellable> = []
+    
+    // =========================================================
+    // MARK: - Scanner(Pipe) mode state
+    // =========================================================
+    
+    /// スキャナから戻ってきた結果（ドメイン）
+    @Published var collectedPipes: [ScanItem] = []
+    /// 未確認部材一覧パネル “使い回し用” の表示データ（rectダミー）
+    @Published var pipePanelRects: [CanvasRect] = []
+    /// いま「ScanItemモードでパネル表示中」か（0件なら false ）
+    @Published var isPipeListMode: Bool = false
+    /// checkback送信中のID（pipeCheckID）
+    @Published var checkingPipeIDs: Set<String> = []
+    /// 全体送信中（ボタン連打防止）
+    @Published var isCheckingBack: Bool = false
+    /// エラー表示用
+    @Published var lastErrorMessage: String? = nil
+    
     // MARK: - Init
-
+    
     init(
         services: YamatoServices,
         payload: ProjectOpenPayload,
@@ -3019,10 +3064,17 @@ final class OperationStore: ObservableObject {
             entryProjectID: payload.project.id,
             selectedImageURL: selectedImageURL
         )
+        // config 変更を Store に取り込む（UI更新トリガーにする）
+        OperationConfigStore.shared.$config
+            .sink { [weak self] v in
+                self?.config = v
+            }
+            .store(in: &cancellables)
+        
     }
-
+    
     // MARK: - Boot / Refresh
-
+    
     /// 画面初回表示時に1回呼ぶ想定
     ///
     /// なぜStoreがやる？
@@ -3030,11 +3082,11 @@ final class OperationStore: ObservableObject {
     func boot() async {
         isBooting = true
         defer { isBooting = false }
-
+        
         // 1) entry を最初に開く（起動直後の表示先）
         let entryID = payload.project.id
         currentProjectID = entryID
-
+        
         // 2) entry画像ロック（画面中固定）
         do {
             currentLoadedImage = try await model.lockedEntryImage()
@@ -3043,34 +3095,34 @@ final class OperationStore: ObservableObject {
             print("[ERROR] entry画像ダウンロード失敗:", error)
             currentLoadedImage = .initial
         }
-
+        
         // 3) リンクプロジェクト一覧＋rect統合を更新
         await refreshProjectsIfNeeded()
-
+        
         // 4) 全rectを“元データ”として保持
         overlayRects = model.allRects
     }
-
+    
     /// 画面復帰やプロジェクト切替のタイミングで呼ぶ
     func refreshProjectsIfNeeded() async {
         let fallback = payload.project.id
         let currentID = currentProjectID ?? fallback
-
+        
         await model.refresh(currentProjectID: currentID)
-
+        
         // Modelが「全件統合」を作る → Storeは「UI用元データ」として受け取る
         overlayRects = model.allRects
     }
-
+    
     // MARK: - Panel / Mode
-
+    
     /// 未確認パネル表示切替
     /// - 非表示にする時は選択状態もクリア（UI整合性）
     func setUnconfirmedPartsVisible(_ visible: Bool) {
         isUnconfirmedPartsVisible = visible
         if !visible { selectedRectIDs.removeAll() }
     }
-
+    
     /// モード切替時のパネル制御（状態遷移ルール）
     func closePanelsForModeSwitch(from old: InteractionMode, to new: InteractionMode) {
         // “モードが変わったら一旦パネルを閉じる” というUIルールを一箇所に集約
@@ -3080,17 +3132,17 @@ final class OperationStore: ObservableObject {
         isDrawingSettingsPanelVisible = false
         presentedPanel = nil
     }
-
+    
     // MARK: - Project open (from panels / tap)
-
+    
     /// パネルからプロジェクトを開く（必要ならズームも同時に行う）
     @MainActor
     func openProject(projectID: String, zoomRect: CanvasRect?) {
         currentProjectID = projectID
-
+        
         Task { [weak self] in
             guard let self else { return }
-
+            
             // entry はユーザー選択画像（固定）
             if projectID == payload.project.id {
                 self.currentLoadedImage = (try? await self.model.lockedEntryImage()) ?? .initial
@@ -3107,7 +3159,7 @@ final class OperationStore: ObservableObject {
                     }
                 }
             }
-
+            
             // ズームして表示する場合
             if let rect = zoomRect {
                 let c = CGPoint(x: rect.rect.midX, y: rect.rect.midY)
@@ -3115,36 +3167,36 @@ final class OperationStore: ObservableObject {
             }
         }
     }
-
+    
     // MARK: - Canvas tap logic (選択トグル)
-
+    
     /// キャンバスをタップしたときの選択ルール
     ///
     /// なぜStore？
     /// - タップ→選択トグルは「状態遷移ルール」なのでStoreが持つ
     func handleTapOnCanvas(at imagePoint: CGPoint) {
         guard isUnconfirmedPartsVisible else { return }
-
+        
         // ✅ 表示用rectから「タップ対象」を作る（= 表示と判定を一致させる）
         let tappable = makeDisplayOverlayRects()
             .filter { !$0.isHidden && !$0.isChecked }   // 未確認だけタップ可能
-
+        
         guard let hit = tappable.reversed().first(where: { $0.rect.contains(imagePoint) }) else {
             return
         }
-
+        
         // ✅ ここはもう “別プロジェクトがヒットする” こと自体が起きない
         // （makeDisplayOverlayRects が currentProject 分だけ返すから）
-
+        
         if selectedRectIDs.contains(hit.id) {
             selectedRectIDs.remove(hit.id)
         } else {
             selectedRectIDs.insert(hit.id)
         }
     }
-
+    
     // MARK: - Overlay composition (canvasへ渡す用)
-
+    
     /// canvas.setOverlayRects に渡す “表示用Rect” を作る
     ///
     /// 表示ルール：
@@ -3152,49 +3204,216 @@ final class OperationStore: ObservableObject {
     /// 2) 未確認部材一覧ONの時だけ、未チェックを表示
     ///    - ただし “現在選択中プロジェクト分だけ” 表示（見た目が散らからないため）
     func makeDisplayOverlayRects() -> [CanvasRect] {
-
-        // 1) チェック済み：常時青
+        
+        let cfg = config
+        
+        // 1) チェック済み：常時表示
         let checkedAll: [CanvasRect] = overlayRects
             .filter { !$0.isHidden && $0.isChecked }
             .map { r in
                 var s = r.style
-                s.strokeColor = .systemBlue
-                s.strokeWidth = max(s.strokeWidth, 2)
-                s.fill = .none
+                
+                // stroke/fill
+                s.strokeColor = cfg.checked.strokeColor.uiColor(alpha: cfg.checked.strokeAlpha)
+                s.strokeWidth = CGFloat(cfg.checked.strokeWidth)
+                s.fill = cfg.checked.fillEnabled
+                ? .solid(cfg.checked.fillColor.uiColor(alpha: cfg.checked.fillAlpha))
+                : .none
+                
+                s.textColor = cfg.checked.textColor.uiColor(alpha: cfg.checked.textAlpha)
+                
                 return r.with(style: s)
             }
-
-        // 2) 未確認：一覧ONの時だけ、現在プロジェクト分のみ（黄色系）
-        let unconfirmedInCurrentProject: [CanvasRect]
-        if isUnconfirmedPartsVisible {
+        
+        // 2) 未確認：一覧ONの時だけ現在プロジェクト分
+        let unconfirmedInCurrentProject: [CanvasRect] = {
+            guard isUnconfirmedPartsVisible else { return [] }
             let unconfirmed = overlayRects.filter { !$0.isHidden && !$0.isChecked }
-
-            if currentProjectID == nil {
-                currentProjectID = unconfirmed.first?.projectID ?? checkedAll.first?.projectID
-            }
-
-            if let pid = currentProjectID {
-                unconfirmedInCurrentProject = unconfirmed.filter { $0.projectID == pid }
-            } else {
-                unconfirmedInCurrentProject = []
-            }
-        } else {
-            unconfirmedInCurrentProject = []
-        }
-
-        // 3) 選択中の強調（最優先で上書き）
+            guard let pid = currentProjectID else { return [] }
+            
+            return unconfirmed
+                .filter { $0.projectID == pid }
+                .map { r in
+                    var s = r.style
+                    s.strokeColor = cfg.unconfirmed.strokeColor.uiColor(alpha: cfg.unconfirmed.strokeAlpha)
+                    s.strokeWidth = CGFloat(cfg.unconfirmed.strokeWidth)
+                    s.fill = cfg.unconfirmed.fillEnabled
+                    ? .solid(cfg.unconfirmed.fillColor.uiColor(alpha: cfg.unconfirmed.fillAlpha))
+                    : .none
+                    
+                    s.textColor = cfg.unconfirmed.textColor.uiColor(alpha: cfg.unconfirmed.textAlpha)
+                    
+                    return r.with(style: s)
+                }
+        }()
+        
+        // 3) 選択中（最優先）
         func applySelectedStyle(_ rects: [CanvasRect]) -> [CanvasRect] {
             rects.map { r in
                 guard selectedRectIDs.contains(r.id) else { return r }
                 var s = r.style
-                s.strokeColor = .systemGreen      // ← 好きな色に
-                s.strokeWidth = max(s.strokeWidth, 4)
-                s.fill = .solid(UIColor.systemGreen.withAlphaComponent(0.18)) // お好みで
+                
+                s.strokeColor = cfg.selection.strokeColor.uiColor(alpha: cfg.selection.strokeAlpha)
+                s.strokeWidth = CGFloat(cfg.selection.strokeWidth)
+                s.fill = cfg.selection.fillEnabled
+                ? .solid(cfg.selection.fillColor.uiColor(alpha: cfg.selection.fillAlpha))
+                : .none
+                
+                s.textColor = cfg.selection.textColor.uiColor(alpha: cfg.selection.textAlpha)
+                
                 return r.with(style: s)
             }
         }
-
+        
         return applySelectedStyle(checkedAll) + applySelectedStyle(unconfirmedInCurrentProject)
+    }
+    
+    // =========================================================
+    // MARK: - Scanner -> Store integration
+    // =========================================================
+    
+    /// スキャナから戻ってきた ScanItem を受け取る
+    /// - ✅ 0件なら「何も開かない」＝通常モードのまま
+    /// - ✅ 1件でもあれば「ScanItemモードでパネルを開く」
+    func acceptCollectedPipes(_ items: [ScanItem]) {
+        
+        // 0件は何もしない（通常運用）
+        guard !items.isEmpty else {
+            collectedPipes = []
+            pipePanelRects = []
+            isPipeListMode = false
+            checkingPipeIDs.removeAll()
+            isCheckingBack = false
+            lastErrorMessage = nil
+            // パネルも開かない。既に開いてたら閉じるならここで閉じてもOK
+            // presentedPanel = nil
+            // isUnconfirmedPartsVisible = false
+            // selectedRectIDs.removeAll()
+            return
+        }
+        
+        collectedPipes = items
+        isPipeListMode = true
+        lastErrorMessage = nil
+        
+        // ScanItem -> パネル用 rect
+        pipePanelRects = makePanelRects(from: items)
+        
+        // overlayRects にも checkback 状態を反映（該当する rect があれば）
+        applyCollectedPipesToOverlayRects()
+        
+        // パネルを開く
+        presentedPanel = .unconfirmedParts
+        isUnconfirmedPartsVisible = true
+        selectedRectIDs.removeAll()
+    }
+    
+    /// 未確認部材一覧パネルへ渡す rects（使い回し）
+    /// - ScanItemモードなら pipePanelRects
+    /// - それ以外は従来 rects
+    var unconfirmedPanelRects: [CanvasRect] {
+        isPipeListMode ? pipePanelRects : overlayRects
+    }
+    
+    /// ScanItem -> CanvasRect（確認済みも消さずに全部出す）
+    private func makePanelRects(from items: [ScanItem]) -> [CanvasRect] {
+        var out: [CanvasRect] = []
+        out.reserveCapacity(items.reduce(0) { $0 + $1.results.count })
+        
+        for item in items {
+            for entry in item.results {
+                let pname = model.projects.first(where: { $0.id == entry.projectID })?.name
+                out.append(CanvasRect.fromScanEntry(item: item, entry: entry, projectName: pname))
+            }
+        }
+        
+        // ✅ 「確認済みも消さない」ので filter はしない
+        
+        out.sort {
+            if $0.projectID != $1.projectID { return $0.projectID < $1.projectID }
+            return ($0.pipeCheckBackID ?? $0.name) < ($1.pipeCheckBackID ?? $1.name)
+        }
+        
+        return out
+    }
+    
+    /// 選択中の項目をチェックバックして、結果をリストに反映
+    func checkBackSelectedPipes() async {
+        guard isPipeListMode else { return }
+        guard !isCheckingBack else { return }
+        
+        let selected = pipePanelRects.filter { selectedRectIDs.contains($0.id) }
+        let ids = Array(Set(selected.compactMap { $0.pipeCheckBackID }.filter { !$0.isEmpty }))
+        
+        guard !ids.isEmpty else { return }
+        
+        isCheckingBack = true
+        lastErrorMessage = nil
+        
+        // 送信中アイコン用
+        checkingPipeIDs.formUnion(ids)
+        
+        defer {
+            isCheckingBack = false
+            checkingPipeIDs.subtract(ids)
+        }
+        
+        do {
+            // あなたのサービス名に合わせてここは1行差し替え
+            // Endpointは PipeCheckBackEndpoint(ids:) でOK
+            let backs: [PipeCheckBackResult] = try await services.pipeCheck.checkBack(ids: ids)
+            
+            // collectedPipes に反映
+            for i in collectedPipes.indices {
+                collectedPipes[i].mergeCheckBack(backs)
+            }
+            
+            // パネルを更新（✅確認済みも残る）
+            pipePanelRects = makePanelRects(from: collectedPipes)
+            
+            // overlay にも反映
+            applyCollectedPipesToOverlayRects()
+            
+            // 選択解除
+            selectedRectIDs.removeAll()
+            
+        } catch {
+            lastErrorMessage = "\(error)"
+        }
+    }
+    
+    /// collectedPipes の checkback 状態を overlayRects に反映する
+    private func applyCollectedPipesToOverlayRects() {
+        guard !collectedPipes.isEmpty else { return }
+        
+        // projectID|pipeCheckID -> checkbacked
+        var dict: [String: Bool] = [:]
+        dict.reserveCapacity(collectedPipes.reduce(0) { $0 + $1.results.count })
+        
+        for item in collectedPipes {
+            for e in item.results {
+                dict["\(e.projectID)|\(e.pipeCheckID)"] = e.checkbacked
+            }
+        }
+        
+        var changed = false
+        var next = overlayRects
+        
+        for i in next.indices {
+            guard !next[i].projectID.isEmpty,
+                  let pipeID = next[i].pipeCheckBackID, !pipeID.isEmpty
+            else { continue }
+            
+            let key = "\(next[i].projectID)|\(pipeID)"
+            guard let cb = dict[key] else { continue }
+            
+            if next[i].isChecked != cb {
+                next[i].isChecked = cb
+                changed = true
+            }
+        }
+        
+        if changed { overlayRects = next }
     }
 }
 
@@ -3203,7 +3422,7 @@ private extension CanvasRect {
     func with(style: CanvasRectStyle) -> CanvasRect {
         CanvasRect(
             id: id,
-            externalID: externalID,
+            externalID: pipeCheckBackID,
             name: name,
             projectID: projectID,
             projectName: projectName,
@@ -3216,6 +3435,7 @@ private extension CanvasRect {
 }
 
 //  MARK: - LinkProject用ヘルパー
+
 extension OperationStore{
     /// LinkProjectsPanelView に渡す表示用アイテム
     var linkProjectItems: [LinkProjectItem] {
@@ -3224,6 +3444,38 @@ extension OperationStore{
         }
     }
 }
+
+//  MARK: - CanvasRectのデザインをユーザー設定から読み込む
+private func style(from s: OperationConfig.SelectionStyle) -> CanvasRectStyle {
+    CanvasRectStyle(
+        strokeColor: s.strokeColor.uiColor,
+        strokeWidth: CGFloat(s.strokeWidth),
+        fill: s.fillEnabled
+        ? .solid(s.fillColor.uiColor.withAlphaComponent(CGFloat(s.fillAlpha)))
+        : .none
+    )
+}
+
+private func style(from s: OperationConfig.CheckedStyle) -> CanvasRectStyle {
+    CanvasRectStyle(
+        strokeColor: s.strokeColor.uiColor.withAlphaComponent(CGFloat(s.strokeAlpha)),
+        strokeWidth: CGFloat(s.strokeWidth),
+        fill: s.fillEnabled
+        ? .solid(s.fillColor.uiColor.withAlphaComponent(CGFloat(s.fillAlpha)))
+        : .none
+    )
+}
+
+private func style(from s: OperationConfig.UnconfirmedStyle) -> CanvasRectStyle {
+    CanvasRectStyle(
+        strokeColor: s.strokeColor.uiColor.withAlphaComponent(CGFloat(s.strokeAlpha)),
+        strokeWidth: CGFloat(s.strokeWidth),
+        fill: s.fillEnabled
+        ? .solid(s.fillColor.uiColor.withAlphaComponent(CGFloat(s.fillAlpha)))
+        : .none
+    )
+}
+
 
 
 ZoomPanDrawingPlaygound/OperationScreen/DrawingLocalStore.swift
@@ -3386,6 +3638,31 @@ final class DrawingLocalStore {
 }
 
 
+ZoomPanDrawingPlaygound/OperationScreen/YamatoScannerFeatureAdapters/PipeCheckServiceAdapter.swift
+----------------------------------------
+import YamatoAPIKit
+import YamatoAppContracts
+
+@MainActor
+public final class PipeCheckServiceAdapter: PipeCheckServicing {
+    private let services: YamatoServices
+
+    public init(services: YamatoServices) {
+        self.services = services
+    }
+
+    public func check(projectID: String, pipeName: String) async throws -> [PipeCheckResult] {
+        let resp = try await services.pipeCheck.check(projectID: projectID, pipeName: pipeName)
+        return resp
+    }
+
+    public func checkBack(ids: [String]) async throws -> [PipeCheckBackResult] {
+        let resp = try await services.pipeCheck.checkBack(ids: ids)
+        return resp
+    }
+}
+
+
 ZoomPanDrawingPlaygound/OperationScreen/OperationScreen+Canvas.swift
 ----------------------------------------
 import DrawingKit
@@ -3418,13 +3695,13 @@ extension OperationScreen {
                 set: { store.zoomRequest = $0 }
             ),
             onTapImagePoint: { p in
-                // ✅ タップ→状態遷移ルールは Store に集約（Viewは「通知」だけ）
+                // タップ→状態遷移ルールは Store に集約（Viewは「通知」だけ）
                 store.handleTapOnCanvas(at: p)
-                // ✅ 見た目更新（canvas参照を触るのはViewの責務）
+                // 見た目更新（canvas参照を触るのはViewの責務）
                 syncOverlayRects()
             }
         )
-        // ✅ 画像が切り替わったらRepresentableを作り直してズレを防ぐ
+        // 画像が切り替わったらRepresentableを作り直してズレを防ぐ
         .id(store.currentLoadedImage.name)
     }
 
@@ -3508,6 +3785,18 @@ struct RectPreset: Equatable {
     var centerY: CGFloat
     var width: CGFloat
     var height: CGFloat
+}
+
+// 全画面（fullScreenCover）用 route
+enum FullScreenRoute: Identifiable, Equatable {
+    case pipeScanner(projectID: String)
+
+    var id: String {
+        switch self {
+        case .pipeScanner(let projectID):
+            return "pipeScanner:\(projectID)"
+        }
+    }
 }
 
 enum SampleData {
@@ -4211,6 +4500,7 @@ public struct ProjectStubDTO: Encodable {
 ZoomPanDrawingPlaygound/Mock/Dummy.swift
 ----------------------------------------
 import Foundation
+import YamatoAppContracts
 import CoreGraphics
 import YamatoAPIKit
 
@@ -4303,6 +4593,78 @@ public enum DummyMemoFactory {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f.string(from: date)
+    }
+}
+
+// ScanItem の検証用ダミーデータ
+enum ScanItemDemoFactory {
+
+    static func make(projectID: String) -> [ScanItem] {
+
+        [
+            // ✅ 登録あり・未チェックバック
+            ScanItem(
+                value: "A-100",
+                results: [
+                    PipeCheckEntry(
+                        projectID: projectID,
+                        pipeName: "系統A-100",
+                        pipeCheckID: "pc_100",
+                        checkbacked: false,
+                        checkbackUser: nil,
+                        checkbackAt: nil
+                    )
+                ],
+                state: .matchUncheck
+            ),
+
+            // ✅ 登録あり・チェックバック済み
+            ScanItem(
+                value: "B-200",
+                results: [
+                    PipeCheckEntry(
+                        projectID: projectID,
+                        pipeName: "系統B-200",
+                        pipeCheckID: "pc_200",
+                        checkbacked: true,
+                        checkbackUser: "一般ユーザー太郎",
+                        checkbackAt: Date().addingTimeInterval(-3600)
+                    )
+                ],
+                state: .matchCheckback
+            ),
+
+            // ✅ 同一文字列で複数 project にヒット
+            ScanItem(
+                value: "C-300",
+                results: [
+                    PipeCheckEntry(
+                        projectID: projectID,
+                        pipeName: "系統C-300",
+                        pipeCheckID: "pc_300_a",
+                        checkbacked: false,
+                        checkbackUser: nil,
+                        checkbackAt: nil
+                    ),
+                    PipeCheckEntry(
+                        projectID: "other_project",
+                        pipeName: "系統C-300",
+                        pipeCheckID: "pc_300_b",
+                        checkbacked: true,
+                        checkbackUser: "検査員A",
+                        checkbackAt: Date().addingTimeInterval(-7200)
+                    )
+                ],
+                state: .matchUncheck
+            ),
+
+            // ❌ 未登録
+            ScanItem(
+                value: "X-999",
+                results: [],
+                state: .notFound
+            )
+        ]
     }
 }
 

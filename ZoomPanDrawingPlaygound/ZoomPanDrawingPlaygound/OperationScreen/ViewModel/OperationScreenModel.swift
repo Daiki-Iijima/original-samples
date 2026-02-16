@@ -132,24 +132,32 @@ final class OperationScreenModel: ObservableObject {
     private func downloadThumbs(projects: [ProjectVM]) async -> [ProjectVM] {
         var next = projects
 
-        await withTaskGroup(of: (Int, LoadedImage?).self) { group in
+        await withTaskGroup(of: (Int, Data?).self) { group in
             for i in next.indices {
-                // entryは固定なのでスキップ
                 if next[i].id == entryProjectID { continue }
                 guard let url = next[i].thumbnailURL else { continue }
 
                 group.addTask {
                     do {
-                        let img = try await LoadedImage(url: url)
-                        return (i, img)
+                        let (data, resp) = try await URLSession.shared.data(from: url)
+                        if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                            return (i, nil)
+                        }
+                        return (i, data)
                     } catch {
                         return (i, nil)
                     }
                 }
             }
 
-            for await (i, img) in group {
-                next[i].loadedThumb = img
+            for await (i, data) in group {
+                guard
+                    let data,
+                    let image = UIImage(data: data),
+                    let url = next[i].thumbnailURL
+                else { continue }
+
+                next[i].loadedThumb = LoadedImage(name: url.lastPathComponent, image: image, url: url)
             }
         }
 

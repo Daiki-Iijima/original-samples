@@ -2,7 +2,7 @@ import Foundation
 import YamatoAPIKit
 import UIKit
 
-struct ProjectVM: Identifiable, Sendable {
+struct ProjectVM: Identifiable{
     let id: String
     var name: String
 
