@@ -12,6 +12,8 @@
 		A68BCAF22F3DFA1500A13110 /* YamatoAPIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCAF12F3DFA1500A13110 /* YamatoAPIKit */; };
 		A68BCAF52F3DFF6500A13110 /* YamatoAppContracts in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCAF42F3DFF6500A13110 /* YamatoAppContracts */; };
 		A68BCC2D2F41ACC000A13110 /* YamatoScannerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCC2C2F41ACC000A13110 /* YamatoScannerFeature */; };
+		A68BCD992F42C89E00A13110 /* YamatoAppContracts in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCD982F42C89E00A13110 /* YamatoAppContracts */; };
+		A68BCE7C2F43010800A13110 /* YamatoOperationFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A68BCE7B2F43010800A13110 /* YamatoOperationFeature */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,8 @@
 				A68BCA962F3DF39400A13110 /* DrawingKit in Frameworks */,
 				A64898E82F1E307C0046550E /* DrawingKit in Frameworks */,
 				A68BCAF22F3DFA1500A13110 /* YamatoAPIKit in Frameworks */,
+				A68BCE7C2F43010800A13110 /* YamatoOperationFeature in Frameworks */,
+				A68BCD992F42C89E00A13110 /* YamatoAppContracts in Frameworks */,
 				A68BCC2D2F41ACC000A13110 /* YamatoScannerFeature in Frameworks */,
 				A68BCAF52F3DFF6500A13110 /* YamatoAppContracts in Frameworks */,
 			);
@@ -46,7 +50,6 @@
 			isa = PBXGroup;
 			children = (
 				A64898BA2F1E2F620046550E /* ZoomPanDrawingPlaygound */,
-				A64898E62F1E307C0046550E /* Frameworks */,
 				A64898B92F1E2F620046550E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -57,13 +60,6 @@
 				A64898B82F1E2F620046550E /* ZoomPanDrawingPlaygound.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		A64898E62F1E307C0046550E /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -91,6 +87,8 @@
 				A68BCAF12F3DFA1500A13110 /* YamatoAPIKit */,
 				A68BCAF42F3DFF6500A13110 /* YamatoAppContracts */,
 				A68BCC2C2F41ACC000A13110 /* YamatoScannerFeature */,
+				A68BCD982F42C89E00A13110 /* YamatoAppContracts */,
+				A68BCE7B2F43010800A13110 /* YamatoOperationFeature */,
 			);
 			productName = ZoomPanDrawingPlaygound;
 			productReference = A64898B82F1E2F620046550E /* ZoomPanDrawingPlaygound.app */;
@@ -123,8 +121,9 @@
 			packageReferences = (
 				A68BCA942F3DF39400A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/DrawingKit" */,
 				A68BCAF02F3DFA1500A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAPIKit" */,
-				A68BCAF32F3DFF6500A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAppContracts" */,
 				A68BCC2B2F41ACC000A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoScannerFeature" */,
+				A68BCD972F42C89E00A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAppContracts" */,
+				A68BCE7A2F43010800A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoOperationFeature" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A64898B92F1E2F620046550E /* Products */;
@@ -380,13 +379,17 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../../../Desktop/YamatoAPIKit;
 		};
-		A68BCAF32F3DFF6500A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAppContracts" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../../../Desktop/YamatoAppContracts;
-		};
 		A68BCC2B2F41ACC000A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoScannerFeature" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../../../Desktop/YamatoScannerFeature;
+		};
+		A68BCD972F42C89E00A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoAppContracts" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../../Desktop/YamatoAppContracts;
+		};
+		A68BCE7A2F43010800A13110 /* XCLocalSwiftPackageReference "../../../../../Desktop/YamatoOperationFeature" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../../Desktop/YamatoOperationFeature;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -410,6 +413,14 @@
 		A68BCC2C2F41ACC000A13110 /* YamatoScannerFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = YamatoScannerFeature;
+		};
+		A68BCD982F42C89E00A13110 /* YamatoAppContracts */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YamatoAppContracts;
+		};
+		A68BCE7B2F43010800A13110 /* YamatoOperationFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YamatoOperationFeature;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

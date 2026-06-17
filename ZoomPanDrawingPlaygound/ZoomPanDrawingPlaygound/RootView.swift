@@ -1,6 +1,7 @@
 import SwiftUI
 import YamatoAPIKit
 import YamatoAppContracts
+import YamatoOperationFeature
 
 @available(iOS 16.0, *)
 struct RootView: View {
